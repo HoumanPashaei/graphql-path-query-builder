@@ -1,0 +1,401 @@
+Found 200 ways to reach the "User" node:
+---------------------------------------------------------------------------
+[1] Query (getCompany) -> Company (client) -> User
+---------------------------------------------------------------------------
+[2] Query (getCompany) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[3] Query (getCompany) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[4] Query (getFinancial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[5] Query (getFinancial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[6] Query (getFinancial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[7] Query (user) -> UserFullProfile (generalInfo) -> User
+---------------------------------------------------------------------------
+[8] Query (users) -> UserList (docs) -> User
+---------------------------------------------------------------------------
+[9] Query (creditTransaction) -> CreditTransaction (user) -> User
+---------------------------------------------------------------------------
+[10] Query (creditTransaction) -> CreditTransaction (committer) -> User
+---------------------------------------------------------------------------
+[11] Query (paymentTransaction) -> PaymentTransaction (user) -> User
+---------------------------------------------------------------------------
+[12] Query (paymentTransaction) -> PaymentTransaction (committer) -> User
+---------------------------------------------------------------------------
+[13] Query (getPonaAdvertorial) -> PonaAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[14] Query (getPonaAdvertorial) -> PonaAdvertorial (deletedBy) -> User
+---------------------------------------------------------------------------
+[15] Query (getPonaAdvertorial) -> PonaAdvertorial (createdBy) -> User
+---------------------------------------------------------------------------
+[16] Query (getPonaAdvertorial) -> PonaAdvertorial (updatedBy) -> User
+---------------------------------------------------------------------------
+[17] Query (getPonaCampaign) -> PonaCampaign (paidBy) -> User
+---------------------------------------------------------------------------
+[18] Query (getPonaCampaign) -> PonaCampaign (client) -> User
+---------------------------------------------------------------------------
+[19] Query (getPonaMedia) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[20] Query (getPonaMedia) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[21] Query (getPonaMedia) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[22] Query (getPonaMedia) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[23] Query (getPonaMedia) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[24] Query (getPonaMedia) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[25] Query (getPonaMedia) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[26] Query (getPonaOrder) -> PonaOrder (advertiser) -> User
+---------------------------------------------------------------------------
+[27] Query (getPonaOrder) -> PonaOrder (verifiedBy) -> User
+---------------------------------------------------------------------------
+[28] Query (getPonaPlan) -> PonaPlan (verifiedBy) -> User
+---------------------------------------------------------------------------
+[29] Query (getPonaPlan) -> PonaPlan (activatedBy) -> User
+---------------------------------------------------------------------------
+[30] Query (getPonaPlan) -> PonaPlan (deletedBy) -> User
+---------------------------------------------------------------------------
+[31] Query (getPonaPlan) -> PonaPlan (createdBy) -> User
+---------------------------------------------------------------------------
+[32] Query (getPonaPlan) -> PonaPlan (updatedBy) -> User
+---------------------------------------------------------------------------
+[33] Query (pushPlatform) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[34] Query (ticket) -> Ticket (user) -> User
+---------------------------------------------------------------------------
+[35] Query (ticket) -> Ticket (readBy) -> User
+---------------------------------------------------------------------------
+[36] Query (ticket) -> Ticket (createdBy) -> User
+---------------------------------------------------------------------------
+[37] Query (ticket) -> Ticket (updatedBy) -> User
+---------------------------------------------------------------------------
+[38] Query (companyList) -> CompanyList (docs) -> Company (client) -> User
+---------------------------------------------------------------------------
+[39] Query (companyList) -> CompanyList (docs) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[40] Query (companyList) -> CompanyList (docs) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[41] Query (financialList) -> FinancialList (docs) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[42] Query (financialList) -> FinancialList (docs) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[43] Query (financialList) -> FinancialList (docs) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[44] Query (creditTransaction) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (user) -> User
+---------------------------------------------------------------------------
+[45] Query (creditTransaction) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (committer) -> User
+---------------------------------------------------------------------------
+[46] Query (creditTransactions) -> CreditTransactionList (docs) -> CreditTransaction (user) -> User
+---------------------------------------------------------------------------
+[47] Query (creditTransactions) -> CreditTransactionList (docs) -> CreditTransaction (committer) -> User
+---------------------------------------------------------------------------
+[48] Query (paymentTransaction) -> PaymentTransaction (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[49] Query (paymentTransactions) -> PaymentTransactionList (docs) -> PaymentTransaction (user) -> User
+---------------------------------------------------------------------------
+[50] Query (paymentTransactions) -> PaymentTransactionList (docs) -> PaymentTransaction (committer) -> User
+---------------------------------------------------------------------------
+[51] Query (ponaAdvertorialList) -> PonaAdvertorialList (docs) -> PonaAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[52] Query (ponaAdvertorialList) -> PonaAdvertorialList (docs) -> PonaAdvertorial (deletedBy) -> User
+---------------------------------------------------------------------------
+[53] Query (ponaAdvertorialList) -> PonaAdvertorialList (docs) -> PonaAdvertorial (createdBy) -> User
+---------------------------------------------------------------------------
+[54] Query (ponaAdvertorialList) -> PonaAdvertorialList (docs) -> PonaAdvertorial (updatedBy) -> User
+---------------------------------------------------------------------------
+[55] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (advertiser) -> User
+---------------------------------------------------------------------------
+[56] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (verifiedBy) -> User
+---------------------------------------------------------------------------
+[57] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (paidBy) -> User
+---------------------------------------------------------------------------
+[58] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (client) -> User
+---------------------------------------------------------------------------
+[59] Query (getPonaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (verifiedBy) -> User
+---------------------------------------------------------------------------
+[60] Query (getPonaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (activatedBy) -> User
+---------------------------------------------------------------------------
+[61] Query (getPonaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (deletedBy) -> User
+---------------------------------------------------------------------------
+[62] Query (getPonaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (createdBy) -> User
+---------------------------------------------------------------------------
+[63] Query (getPonaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (updatedBy) -> User
+---------------------------------------------------------------------------
+[64] Query (getPonaMedia) -> PonaMedia (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[65] Query (getPonaMedia) -> PonaMedia (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[66] Query (getPonaMedia) -> PonaMedia (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[67] Query (getPonaMedia) -> PonaMedia (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[68] Query (getPonaMedia) -> PonaMedia (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[69] Query (getPonaMedia) -> PonaMedia (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[70] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[71] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[72] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[73] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[74] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[75] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[76] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[77] Query (getPonaOrder) -> PonaOrder (ponaAdvertorial) -> PonaOrderedAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[78] Query (getPonaOrder) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (paidBy) -> User
+---------------------------------------------------------------------------
+[79] Query (getPonaOrder) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (client) -> User
+---------------------------------------------------------------------------
+[80] Query (ponaOrderList) -> PonaOrderList (docs) -> PonaOrder (advertiser) -> User
+---------------------------------------------------------------------------
+[81] Query (ponaOrderList) -> PonaOrderList (docs) -> PonaOrder (verifiedBy) -> User
+---------------------------------------------------------------------------
+[82] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[83] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[84] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[85] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[86] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[87] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[88] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[89] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (verifiedBy) -> User
+---------------------------------------------------------------------------
+[90] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (activatedBy) -> User
+---------------------------------------------------------------------------
+[91] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (deletedBy) -> User
+---------------------------------------------------------------------------
+[92] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (createdBy) -> User
+---------------------------------------------------------------------------
+[93] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (updatedBy) -> User
+---------------------------------------------------------------------------
+[94] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[95] Query (pushPlatform) -> PushPlatform (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[96] Query (pushPlatform) -> PushPlatform (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[97] Query (pushPlatform) -> PushPlatform (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[98] Query (pushPlatform) -> PushPlatform (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[99] Query (pushPlatform) -> PushPlatform (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[100] Query (pushPlatform) -> PushPlatform (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[101] Query (pushPlatform) -> PushPlatform (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[102] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[103] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[104] Query (ticket) -> Ticket (threads) -> Thread (createdBy) -> User
+---------------------------------------------------------------------------
+[105] Query (ticket) -> Ticket (threads) -> Thread (updatedBy) -> User
+---------------------------------------------------------------------------
+[106] Query (tickets) -> TicketList (docs) -> Ticket (user) -> User
+---------------------------------------------------------------------------
+[107] Query (tickets) -> TicketList (docs) -> Ticket (readBy) -> User
+---------------------------------------------------------------------------
+[108] Query (tickets) -> TicketList (docs) -> Ticket (createdBy) -> User
+---------------------------------------------------------------------------
+[109] Query (tickets) -> TicketList (docs) -> Ticket (updatedBy) -> User
+---------------------------------------------------------------------------
+[110] Query (creditTransaction) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[111] Query (creditTransactions) -> CreditTransactionList (docs) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (user) -> User
+---------------------------------------------------------------------------
+[112] Query (creditTransactions) -> CreditTransactionList (docs) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (committer) -> User
+---------------------------------------------------------------------------
+[113] Query (paymentTransactions) -> PaymentTransactionList (docs) -> PaymentTransaction (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[114] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaAdvertorial) -> PonaOrderedAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[115] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (paidBy) -> User
+---------------------------------------------------------------------------
+[116] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (client) -> User
+---------------------------------------------------------------------------
+[117] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (ponaOrders) -> PonaOrder (advertiser) -> User
+---------------------------------------------------------------------------
+[118] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (ponaOrders) -> PonaOrder (verifiedBy) -> User
+---------------------------------------------------------------------------
+[119] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (ponaPlans) -> PonaPlan (verifiedBy) -> User
+---------------------------------------------------------------------------
+[120] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (ponaPlans) -> PonaPlan (activatedBy) -> User
+---------------------------------------------------------------------------
+[121] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (ponaPlans) -> PonaPlan (deletedBy) -> User
+---------------------------------------------------------------------------
+[122] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (ponaPlans) -> PonaPlan (createdBy) -> User
+---------------------------------------------------------------------------
+[123] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (ponaPlans) -> PonaPlan (updatedBy) -> User
+---------------------------------------------------------------------------
+[124] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[125] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[126] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[127] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[128] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[129] Query (ponaMediaList) -> PonaMediaList (docs) -> PonaMedia (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[130] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[131] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[132] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[133] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[134] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[135] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[136] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[137] Query (ponaOrderList) -> PonaOrderList (docs) -> PonaOrder (ponaAdvertorial) -> PonaOrderedAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[138] Query (ponaOrderList) -> PonaOrderList (docs) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (paidBy) -> User
+---------------------------------------------------------------------------
+[139] Query (ponaOrderList) -> PonaOrderList (docs) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (client) -> User
+---------------------------------------------------------------------------
+[140] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[141] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[142] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[143] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[144] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[145] Query (getPonaPlan) -> PonaPlan (ponaMedia) -> PonaMedia (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[146] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[147] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[148] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[149] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[150] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[151] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[152] Query (ponaPlanList) -> PonaPlanList (docs) -> PonaPlan (ponaMedia) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[153] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[154] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[155] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[156] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[157] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[158] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[159] Query (pushNotification) -> PushNotification (platform) -> PushPlatform (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[160] Query (pushNotifications) -> PushNotificationList (docs) -> PushNotification (platform) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[161] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[162] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[163] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[164] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[165] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[166] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[167] Query (pushPlatforms) -> PushPlatformList (docs) -> PushPlatform (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[168] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[169] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[170] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[171] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[172] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[173] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (financial) -> Financial (verifiedBy) -> User
+---------------------------------------------------------------------------
+[174] Query (rssToPush) -> RSSToPush (platform) -> PushPlatform (financial) -> Financial (deletedBy) -> User
+---------------------------------------------------------------------------
+[175] Query (rssToPushes) -> RSSToPushList (docs) -> RSSToPush (platform) -> PushPlatform (user) -> User
+---------------------------------------------------------------------------
+[176] Query (ticket) -> Ticket (lastThread) -> LastThread (thread) -> Thread (createdBy) -> User
+---------------------------------------------------------------------------
+[177] Query (ticket) -> Ticket (lastThread) -> LastThread (thread) -> Thread (updatedBy) -> User
+---------------------------------------------------------------------------
+[178] Query (tickets) -> TicketList (docs) -> Ticket (threads) -> Thread (createdBy) -> User
+---------------------------------------------------------------------------
+[179] Query (tickets) -> TicketList (docs) -> Ticket (threads) -> Thread (updatedBy) -> User
+---------------------------------------------------------------------------
+[180] Query (creditTransactions) -> CreditTransactionList (docs) -> CreditTransaction (paymentTransaction) -> PaymentTransaction (verified) -> Verified (by) -> User
+---------------------------------------------------------------------------
+[181] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (client) -> User
+---------------------------------------------------------------------------
+[182] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (verifiedBy) -> User
+---------------------------------------------------------------------------
+[183] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (deletedBy) -> User
+---------------------------------------------------------------------------
+[184] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (activatedBy) -> User
+---------------------------------------------------------------------------
+[185] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (bannedBy) -> User
+---------------------------------------------------------------------------
+[186] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (createdBy) -> User
+---------------------------------------------------------------------------
+[187] Query (getPonaCampaign) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (updatedBy) -> User
+---------------------------------------------------------------------------
+[188] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaAdvertorial) -> PonaOrderedAdvertorial (client) -> User
+---------------------------------------------------------------------------
+[189] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (paidBy) -> User
+---------------------------------------------------------------------------
+[190] Query (ponaCampaignList) -> PonaCampaignList (docs) -> PonaCampaign (ponaOrders) -> PonaOrder (ponaCampaign) -> PonaCampaignWithoutOrders (client) -> User
+---------------------------------------------------------------------------
+[191] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (verifiedBy) -> User
+---------------------------------------------------------------------------
+[192] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (activatedBy) -> User
+---------------------------------------------------------------------------
+[193] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (deletedBy) -> User
+---------------------------------------------------------------------------
+[194] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (createdBy) -> User
+---------------------------------------------------------------------------
+[195] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (ponaPlans) -> PonaPlan (updatedBy) -> User
+---------------------------------------------------------------------------
+[196] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (company) -> Company (client) -> User
+---------------------------------------------------------------------------
+[197] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (company) -> Company (verifiedBy) -> User
+---------------------------------------------------------------------------
+[198] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (company) -> Company (deletedBy) -> User
+---------------------------------------------------------------------------
+[199] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (financial) -> Financial (client) -> User
+---------------------------------------------------------------------------
+[200] Query (getPonaOrder) -> PonaOrder (ponaPlan) -> PonaOrderedPlan (ponaMedia) -> PonaMedia (financial) -> Financial (verifiedBy) -> User

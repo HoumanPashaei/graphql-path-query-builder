@@ -9,6 +9,7 @@ import re
 import sys
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
 # Optional: color output
@@ -19,6 +20,19 @@ try:
 except Exception:
     _COLORAMA_OK = False
     Fore = Style = None  # type: ignore
+
+
+# ----------------------------
+# ANSI stripping for log files
+# ----------------------------
+
+_ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+
+
+def strip_ansi(s: str) -> str:
+    if not s:
+        return s
+    return _ANSI_RE.sub("", s)
 
 
 # ----------------------------
@@ -560,27 +574,6 @@ def colorize(enabled: bool, text: str, color: str) -> str:
     return f"{color}{text}{Style.RESET_ALL}"
 
 
-def console_print_pretty(*, use_color: bool, body: Dict[str, Any]) -> None:
-    # Pretty console: query multi-line (no \n visible), variables pretty
-    print(colorize(use_color, f"operationName: {body.get('operationName','')}", Fore.CYAN))
-    print(colorize(use_color, "variables:", Fore.CYAN))
-    print(json.dumps(body.get("variables", {}), ensure_ascii=False, indent=2))
-    print(colorize(use_color, "query:", Fore.CYAN))
-    print(body.get("query", ""))  # raw print => real newlines
-
-
-def console_print_burp_line(*, body: Dict[str, Any]) -> None:
-    # Single line JSON, ready to paste into Burp
-    print(json.dumps(body, ensure_ascii=False))
-
-
-def console_print_burp_pretty(*, use_color: bool, body: Dict[str, Any]) -> None:
-    # Show readable parts + provide a single-line body to copy
-    console_print_pretty(use_color=use_color, body=body)
-    print(colorize(use_color, "BURP BODY (copy the next line):", Fore.GREEN))
-    console_print_burp_line(body=body)
-
-
 # ----------------------------
 # CLI
 # ----------------------------
@@ -590,28 +583,23 @@ def main() -> None:
         description="Generate GraphQL query bodies for all paths to a target type (introspection Schema.json)."
     )
 
-    # Required / main
     ap.add_argument("-s", "--schema", required=True, help="Path to Schema.json (introspection result).")
     ap.add_argument("-t", "--target", required=True, help="Target type name (e.g., User).")
     ap.add_argument("-r", "--root", default="Query", help="Root type name (default: Query).")
 
-    # Output
     ap.add_argument("-o", "--out", default="", help="Output file path. If empty, no file is written.")
     ap.add_argument("-f", "--format", choices=["ndjson", "json-array"], default="ndjson",
                     help="File output format (default: ndjson).")
 
-    # Path discovery limits
     ap.add_argument("-D", "--max-path-depth", type=int, default=8, help="Max traversal depth for finding paths.")
     ap.add_argument("-M", "--max-paths", type=int, default=200, help="Max number of paths to output.")
 
-    # Selection / size controls
     ap.add_argument("-d", "--selection-depth", type=int, default=4, help="Max depth for selection sets (default: 4).")
     ap.add_argument("-F", "--max-fields-per-type", type=int, default=30,
                     help="Limit number of fields per type in selections (default: 30).")
     ap.add_argument("-T", "--max-total-fields", type=int, default=500,
                     help="Global limit of selected fields per query (default: 500).")
 
-    # Args/variables
     ap.add_argument("-a", "--arg-mode", choices=["vars", "inline"], default="vars",
                     help="Render args as variables (vars) or inline literals (inline).")
     ap.add_argument("-R", "--include-required-args-fields", action="store_true",
@@ -623,16 +611,13 @@ def main() -> None:
     ap.add_argument("-I", "--max-input-depth", type=int, default=4,
                     help="Max depth for InputObject placeholder skeleton (default: 4).")
 
-    # Bundling
     ap.add_argument("-b", "--bundle-aliases", action="store_true",
                     help="Bundle all paths into one query using aliases p1, p2, ...")
 
-    # Query formatting (affects stored JSON and console multi-line mode)
     ap.add_argument("-Q", "--no-pretty-query", action="store_true",
                     help="Disable pretty formatting of GraphQL query string.")
     ap.add_argument("-i", "--indent", type=int, default=4, help="Indent size for pretty GraphQL query (default: 4).")
 
-    # Console modes
     ap.add_argument("-p", "--paths-only", action="store_true",
                     help="Only print paths (no queries/bodies).")
     ap.add_argument("-m", "--console-mode", choices=["pretty", "burp", "burp_pretty"], default="pretty",
@@ -650,7 +635,6 @@ def main() -> None:
     if use_color and _COLORAMA_OK:
         colorama_init(autoreset=True)
 
-    # Load schema
     try:
         schema = load_introspection_schema(args.schema)
     except FileNotFoundError:
@@ -669,7 +653,6 @@ def main() -> None:
     types = schema.get("types") or []
     schema_types: Dict[str, Dict[str, Any]] = {t["name"]: t for t in types if t.get("name")}
 
-    # Validations
     if args.target not in schema_types:
         msg = f'[ERROR] Target type "{args.target}" does not exist in the provided schema.'
         print(colorize(use_color, msg, Fore.RED) if use_color else msg, file=sys.stderr)
@@ -680,7 +663,6 @@ def main() -> None:
         print(colorize(use_color, msg, Fore.RED) if use_color else msg, file=sys.stderr)
         sys.exit(2)
 
-    # Find paths
     paths = find_paths_to_type(
         schema_types,
         root_type_name=args.root,
@@ -698,24 +680,24 @@ def main() -> None:
                 f.write("" if args.format == "ndjson" else "[]")
         sys.exit(0)
 
-    # Logging for large outputs (solves terminal buffer issues)
     log_fp = None
     if args.console_log and not args.no_console:
         log_fp = open(args.console_log, "w", encoding="utf-8")
 
     def out(line: str = "") -> None:
+        """
+        Print to console (possibly colorized) and also write to log file WITHOUT ANSI codes.
+        """
         if args.no_console:
             return
         print(line)
         if log_fp:
-            log_fp.write(line + "\n")
+            log_fp.write(strip_ansi(line) + "\n")
 
-    # Header
     if not args.no_console:
         header = f'Found {len(paths)} ways to reach the "{args.target}" node:'
         out(colorize(use_color, header, Fore.CYAN) if use_color else header)
 
-    # Paths-only
     path_strings = [render_path_like_enum(p) for p in paths]
     if args.paths_only:
         if not args.no_console:
@@ -727,7 +709,6 @@ def main() -> None:
             log_fp.close()
         sys.exit(0)
 
-    # Build bodies
     bodies: List[Dict[str, Any]] = []
     for i, p in enumerate(paths, start=1):
         op_name = f"op_{args.target}_{i}"
@@ -752,12 +733,10 @@ def main() -> None:
         bodies = [bundled]
         path_strings = [f"{len(paths)} paths bundled with aliases -> {args.target}"]
 
-    # Pretty format query string (keeps real newlines)
     if not args.no_pretty_query:
         for b in bodies:
             b["query"] = pretty_graphql_query(b["query"], indent_size=args.indent, trailing_newline=True)
 
-    # File output (Burp-ready JSON; newlines in query become \n when serialized)
     if args.out:
         if args.format == "ndjson":
             out_text = "\n".join(json.dumps(b, ensure_ascii=False) for b in bodies) + ("\n" if bodies else "")
@@ -766,7 +745,6 @@ def main() -> None:
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(out_text)
 
-    # Console output modes
     if not args.no_console:
         for idx, (pstr, body) in enumerate(zip(path_strings, bodies), start=1):
             out(args.separator)
@@ -776,21 +754,16 @@ def main() -> None:
                 out(colorize(use_color, "BURP BODY (copy the next line):", Fore.GREEN) if use_color else "BURP BODY (copy the next line):")
                 out(json.dumps(body, ensure_ascii=False))
             elif args.console_mode == "burp_pretty":
-                # pretty section
                 out(colorize(use_color, "BODY:", Fore.GREEN) if use_color else "BODY:")
-                # print multiline query WITHOUT \n
-                # NOTE: we cannot use json.dumps for the whole body here (would show \n), so print fields separately
                 out(colorize(use_color, f"operationName: {body.get('operationName','')}", Fore.CYAN) if use_color else f"operationName: {body.get('operationName','')}")
                 out(colorize(use_color, "variables:", Fore.CYAN) if use_color else "variables:")
                 out(json.dumps(body.get("variables", {}), ensure_ascii=False, indent=2))
                 out(colorize(use_color, "query:", Fore.CYAN) if use_color else "query:")
                 out(body.get("query", ""))
 
-                # burp line for copy
                 out(colorize(use_color, "BURP BODY (copy the next line):", Fore.GREEN) if use_color else "BURP BODY (copy the next line):")
                 out(json.dumps(body, ensure_ascii=False))
             else:
-                # pretty (default)
                 out(colorize(use_color, "BODY:", Fore.GREEN) if use_color else "BODY:")
                 out(colorize(use_color, f"operationName: {body.get('operationName','')}", Fore.CYAN) if use_color else f"operationName: {body.get('operationName','')}")
                 out(colorize(use_color, "variables:", Fore.CYAN) if use_color else "variables:")
