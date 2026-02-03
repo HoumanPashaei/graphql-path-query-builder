@@ -1,59 +1,60 @@
-# 🧭 GraphQL Surface Mapper
+# 🌐 GraphQL Surface Mapper
 
 A monorepo that contains:
 
-- **CLI**: GraphQL Path Query Builder (generate Burp-ready GraphQL request bodies from an introspection schema).
-- **Burp Extension** (Montoya): a multi-tab **GraphQL Attack Surface Analyzer** (Path → Query Builder tab will reuse the CLI logic/behavior in the UI and support *Send to Repeater*).
+- 🧰 **CLI**: GraphQL Path Query Builder (generate Burp-ready GraphQL request bodies from an introspection schema).
+- 🧩 **Burp Extension (Montoya)**: a multi-tab **GraphQL Attack Surface Analyzer** (the *Path → Query Builder* tab will reuse the CLI behavior in the UI and support **Send to Repeater**).
 
-> Intended for **authorized security testing and internal analysis only**.
+> 🔐 Intended for **authorized security testing and internal analysis only**.
 
 ---
 
-## 📦 Repository Structure
+## 🗂️ Repository Structure
 
 - `cli/`  
-  Python CLI tool and examples. See: `cli/README.md`
+  🐍 Python CLI tool and examples. See: `cli/README.md`
 
 - `burp-extension/`  
-  Burp Suite extension (Java, Montoya API). See: `burp-extension/README.md` (to be added in upcoming versions)
+  ☕ Burp Suite extension (Java, Montoya API). See: `burp-extension/README.md` *(to be added in upcoming versions)*
 
 - `docs/`  
-  Documentation assets (images, notes)
+  📚 Documentation assets (images, notes)
 
 ---
 
-## 🚀 Quick Start (CLI)
+## ⚡ Quick Start (CLI)
 
-1) Install deps
+1) 📦 Install dependencies
 ```bash
 pip install -r cli/requirements.txt
 ```
 
-2) Run
+2) ▶️ Run
 ```bash
 python cli/gql_path_query_builder.py -s cli/examples/Schema.simple.json -t User -m burp -M 10
 ```
 
 ---
 
-## 🚀 Quick Start (Burp Extension)
+## 🧩 Quick Start (Burp Extension)
 
-The Burp extension is under active development.
-Planned MVP tabs:
-- General Config (Target + headers)
-- Schema (Import/Paste/Fetch introspection)
-- Path → Query Builder (paths table + preview + copy body + send to repeater)
+🚧 The Burp extension is under active development.
 
----
-
-## 🖥️ Documentation
-
-- Security policy: `SECURITY.md`
-- Contributing: `CONTRIBUTING.md`
-- Changelog: `CHANGELOG.md`
+✅ Planned MVP tabs:
+- ⚙️ **General Config** (Target + headers)
+- 🧾 **Schema** (Import / Paste / Fetch introspection)
+- 🧭 **Path → Query Builder** (paths table + preview + copy body + send to repeater)
 
 ---
 
-## 🧾 License
+## 📌 Documentation
+
+- 🔐 Security policy: `SECURITY.md`
+- 🤝 Contributing: `CONTRIBUTING.md`
+- 📝 Changelog: `CHANGELOG.md`
+
+---
+
+## 📄 License
 
 See: `LICENSE`
