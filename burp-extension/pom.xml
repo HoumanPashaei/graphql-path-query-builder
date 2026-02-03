@@ -1,27 +1,31 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.gqlsurfmapper</groupId>
-  <artifactId>gql-surface-mapper</artifactId>
+  <groupId>com.gqlasa</groupId>
+  <artifactId>gql-asa-burp-extension</artifactId>
   <version>0.1.0</version>
-  <name>GraphQL Surface Mapper</name>
+  <name>GQL-ASA Burp Extension</name>
 
   <properties>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <montoya.version>2025.12</montoya.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>net.portswigger.burp.extensions</groupId>
       <artifactId>montoya-api</artifactId>
-      <version>${montoya.version}</version>
+      <version>2025.12</version>
       <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.17.2</version>
     </dependency>
   </dependencies>
 
@@ -29,15 +33,19 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>3.4.2</version>
-        <configuration>
-          <archive>
-            <manifestEntries>
-              <Main-Class>com.gqlsurfmapper.gqlasa.GqlAsaExtension</Main-Class>
-            </manifestEntries>
-          </archive>
-        </configuration>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>all</shadedClassifierName>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
