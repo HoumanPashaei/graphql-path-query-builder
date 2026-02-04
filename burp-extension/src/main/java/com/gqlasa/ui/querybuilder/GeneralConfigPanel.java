@@ -11,53 +11,68 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class GeneralConfigPanel extends JPanel {
+
+    private JComboBox<String> scheme;
+    private JTextField host;
+    private JComboBox<String> port;
+    private JComboBox<String> endpointPath;
+    private JComboBox<String> method;
+    private JComboBox<String> contentType;
+    private HeadersTableModel headersModel;
+
+    
     private final GeneralConfig cfg = AppState.get().config;
 
-    // Editable combos with common values
-    private final JComboBox<String> scheme = editableCombo(new String[]{"https", "http"}, cfg.scheme, 10);
-    private final JTextField host = new JTextField(cfg.host, 26);
-    private final JComboBox<String> port = editableCombo(new String[]{"443", "80"}, String.valueOf(cfg.port), 10);
-    private final JComboBox<String> endpoint = editableCombo(
-            new String[]{
-                    "/graphql",
-                    "/api",
-                    "/api/graphql",
-                    "/graphql/api",
-                    "/graphql/graphql",
-                    "/v1/graphql",
-                    "/api/v1",
-                    "/api/v1/graphql",
-                    "/graphql/api/v1",
-                    "v1/graphql/graphql" // requested (no leading slash)
-            },
-            cfg.endpointPath, 26
-    );
-
-    private final JComboBox<String> method = new JComboBox<>(new String[]{"POST","GET"});
-    private final JComboBox<String> contentType = editableCombo(
-            new String[]{"application/json", "application/graphql", "application/x-www-form-urlencoded"},
-            cfg.contentType, 26
-    );
-
-    private final HeadersTableModel headersModel = new HeadersTableModel(cfg.headers);
-
-    // Quick-add header controls
-    private final JComboBox<String> quickHeaderKey = editableCombo(commonHeaderKeys(), "", 20);
-    private final JComboBox<String> quickHeaderValue = editableCombo(new String[]{""}, "", 40);
+    // UI fields (initialized in constructor)
+    private JComboBox<String> quickHeaderKey;
+    private JComboBox<String> quickHeaderValue;
 
     private final JLabel status = new JLabel(" ");
-
     private final Timer statusClear = new Timer(2500, e -> status.setText(" "));
 
-    public GeneralConfigPanel() {
+    private Timer autoSaveTimer;
+
+
+public GeneralConfigPanel() {
         super(new BorderLayout(10,10));
 
         statusClear.setRepeats(false);
+        // Editable combos with common values
+        scheme = editableCombo(new String[]{"https", "http"}, cfg.scheme, 10);
+        host = new JTextField(cfg.host, 26);
+        port = editableCombo(new String[]{"443", "80"}, String.valueOf(cfg.port), 10);
+        endpointPath = editableCombo(
+                new String[]{
+                        "/graphql",
+                        "/api",
+                        "/api/graphql",
+                        "/graphql/api",
+                        "/graphql/graphql",
+                        "/v1/graphql",
+                        "/api/v1",
+                        "/api/v1/graphql",
+                        "/graphql/api/v1",
+                        "v1/graphql/graphql"
+                },
+                cfg.endpointPath, 26
+        );
+
+        method = new JComboBox<>(new String[]{"POST", "GET"});
+        contentType = editableCombo(
+                new String[]{"application/json", "application/graphql", "application/x-www-form-urlencoded"},
+                cfg.contentType, 26
+        );
+
+        headersModel = new HeadersTableModel(cfg.headers);
+
+        quickHeaderKey = editableCombo(commonHeaderKeys(), "", 20);
+        quickHeaderValue = editableCombo(new String[]{""}, "", 40);
+
 
         // Put dropdown arrow on the LEFT: use RTL orientation for comboboxes
         applyLeftArrow(scheme);
         applyLeftArrow(port);
-        applyLeftArrow(endpoint);
+        applyLeftArrow(endpointPath);
         applyLeftArrow(contentType);
         applyLeftArrow(method);
         applyLeftArrow(quickHeaderKey);
@@ -79,7 +94,7 @@ public class GeneralConfigPanel extends JPanel {
         addRow(form, gc, r++, "Scheme", scheme);
         addRow(form, gc, r++, "Host", host);
         addRow(form, gc, r++, "Port", port);
-        addRow(form, gc, r++, "Endpoint path", endpoint);
+        addRow(form, gc, r++, "Endpoint path", endpointPath);
         addRow(form, gc, r++, "Method", method);
         addRow(form, gc, r++, "Content-Type", contentType);
 
@@ -148,10 +163,59 @@ public class GeneralConfigPanel extends JPanel {
 
         setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
 
+        setupAutoSave();
         updateQuickValueSuggestions();
     }
 
-    private void addRow(JPanel form, GridBagConstraints gc, int row, String label, JComponent comp) {
+    
+    private void setupAutoSave() {
+        // Debounced autosave to avoid frequent writes while typing
+        autoSaveTimer = new Timer(400, e -> saveToStateSilently());
+        autoSaveTimer.setRepeats(false);
+
+        Runnable trigger = () -> {
+            if (autoSaveTimer != null) autoSaveTimer.restart();
+        };
+
+        // Text fields / editable combos: listen to editor component documents
+        attachEditorListener(host, trigger);
+
+        attachComboListener(scheme, trigger);
+        attachComboListener(port, trigger);
+        attachComboListener(endpointPath, trigger);
+        attachComboListener(method, trigger);
+        attachComboListener(contentType, trigger);
+
+        // Headers table changes
+        headersModel.addTableModelListener(e -> trigger.run());
+    }
+
+    private void attachComboListener(JComboBox<String> combo, Runnable trigger) {
+        combo.addActionListener(e -> trigger.run());
+        if (combo.isEditable()) {
+            Component ed = combo.getEditor().getEditorComponent();
+            if (ed instanceof JTextField tf) {
+                attachEditorListener(tf, trigger);
+            }
+        }
+    }
+
+    private void attachEditorListener(JTextField field, Runnable trigger) {
+        field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { trigger.run(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { trigger.run(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { trigger.run(); }
+        });
+    }
+
+    private void saveToStateSilently() {
+        // Same as saveToState but without noisy status messages
+        try {
+            saveToState(false);
+        } catch (Exception ignored) {}
+    }
+
+private void addRow(JPanel form, GridBagConstraints gc, int row, String label, JComponent comp) {
         gc.gridx = 0; gc.gridy = row; gc.weightx = 0; gc.fill = GridBagConstraints.NONE;
         form.add(new JLabel(label + ":"), gc);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1; gc.fill = GridBagConstraints.HORIZONTAL;
@@ -159,11 +223,15 @@ public class GeneralConfigPanel extends JPanel {
     }
 
     private void saveToState() {
+        saveToState(true);
+    }
+
+    private void saveToState(boolean showSavedMessage) {
         GeneralConfig c = AppState.get().config;
 
         c.scheme = Strings.nullToEmpty(getComboText(scheme)).trim();
         c.host = Strings.nullToEmpty(host.getText()).trim();
-        c.endpointPath = Strings.nullToEmpty(getComboText(endpoint)).trim();
+        c.endpointPath = Strings.nullToEmpty(getComboText(endpointPath)).trim();
         c.contentType = Strings.nullToEmpty(getComboText(contentType)).trim();
         c.method = String.valueOf(method.getSelectedItem());
 
@@ -294,4 +362,20 @@ public class GeneralConfigPanel extends JPanel {
                 "REPLACE_ME"
         };
     }
+
+    public void loadFromState() {
+        var cfg = com.gqlasa.model.AppState.get().config;
+
+        scheme.setSelectedItem(cfg.scheme == null ? "" : cfg.scheme);
+        host.setText(cfg.host == null ? "" : cfg.host);
+
+        port.setSelectedItem(String.valueOf(cfg.port));
+        endpointPath.setSelectedItem(cfg.endpointPath == null ? "" : cfg.endpointPath);
+
+        method.setSelectedItem(cfg.method == null ? "POST" : cfg.method.toUpperCase());
+        contentType.setSelectedItem(cfg.contentType == null ? "application/json" : cfg.contentType);
+
+        headersModel.setRows(cfg.headers);
+    }
+
 }

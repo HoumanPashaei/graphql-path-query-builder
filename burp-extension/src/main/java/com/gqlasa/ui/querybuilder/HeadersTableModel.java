@@ -4,6 +4,7 @@ import com.gqlasa.model.HeaderKV;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.List;
+import java.util.ArrayList;
 
 public class HeadersTableModel extends AbstractTableModel {
     private final List<HeaderKV> rows;
@@ -40,5 +41,13 @@ public class HeadersTableModel extends AbstractTableModel {
         if (index < 0 || index >= rows.size()) return;
         rows.remove(index);
         fireTableRowsDeleted(index, index);
+    }
+    public void setRows(java.util.List<com.gqlasa.model.HeaderKV> newRows) {
+        // Defensive copy to avoid clearing the same backing list when caller passes our own list
+        List<HeaderKV> copy = new ArrayList<>();
+        if (newRows != null) copy.addAll(newRows);
+        rows.clear();
+        rows.addAll(copy);
+        fireTableDataChanged();
     }
 }

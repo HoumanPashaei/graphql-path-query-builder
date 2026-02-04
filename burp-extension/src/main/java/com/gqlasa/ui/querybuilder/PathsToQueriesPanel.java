@@ -524,4 +524,11 @@ JPanel bottom = new JPanel(new BorderLayout());
         } catch (Exception ignored) {
         }
     }
+    public void onSchemaChanged() {
+        // Schema changed: clear results and refresh target list
+        clearResults();
+        // Force target refresh
+        lastTargetsRev = -1;
+        refreshTargetsFromSchema();
+    }
 }

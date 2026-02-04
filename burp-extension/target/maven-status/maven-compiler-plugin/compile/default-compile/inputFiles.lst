@@ -17,6 +17,7 @@ P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\s
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\MainPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\GeneralConfigPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\HeadersTableModel.java
+P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\IntrospectionImportProvider.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\PathsTableModel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\PathsToQueriesPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\ProgressDialog.java

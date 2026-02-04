@@ -27,9 +27,11 @@ com\gqlasa\ui\MainPanel.class
 com\gqlasa\core\schema\SchemaIndex.class
 com\gqlasa\core\BurpRequestBuilder.class
 com\gqlasa\model\BuiltQuery.class
+com\gqlasa\ui\querybuilder\GeneralConfigPanel$2.class
 com\gqlasa\ui\querybuilder\PathsToQueriesPanel$3.class
 com\gqlasa\ui\querybuilder\SchemaPanel$4.class
 com\gqlasa\core\PathFinder$Segment.class
 com\gqlasa\core\SchemaLoader.class
 com\gqlasa\model\AppState.class
+com\gqlasa\ui\querybuilder\IntrospectionImportProvider.class
 com\gqlasa\util\Json.class

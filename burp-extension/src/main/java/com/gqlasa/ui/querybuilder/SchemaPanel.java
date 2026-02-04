@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class SchemaPanel extends JPanel {
 
-    private final JTextArea schemaArea = new JTextArea();
+    private JTextArea schemaArea;
     private final JLabel status = new JLabel("Schema: not loaded");
 
     private final Timer applyDebounce;
@@ -26,7 +26,10 @@ public class SchemaPanel extends JPanel {
     private final AtomicLong validationSeq = new AtomicLong(0);
 
     public SchemaPanel() {
+
         super(new BorderLayout(8, 8));
+
+        schemaArea = new JTextArea();
 
         schemaArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         schemaArea.setLineWrap(false);
@@ -81,7 +84,7 @@ public class SchemaPanel extends JPanel {
 
         File f = chooser.getSelectedFile();
 
-        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Loading schema...");
+        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Loading schema (this may take a few minutes on large schemas)...");
         pd.showDialog();
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {
@@ -118,7 +121,7 @@ public class SchemaPanel extends JPanel {
             return;
         }
 
-        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Formatting schema...");
+        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Formatting schema (this may take a few minutes on large schemas)...");
         pd.showDialog();
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {
@@ -199,4 +202,7 @@ public class SchemaPanel extends JPanel {
     }
 
 
+    public void loadSchemaFromState() {
+        schemaArea.setText(com.gqlasa.model.AppState.get().schemaJson == null ? "" : com.gqlasa.model.AppState.get().schemaJson);
+    }
 }
