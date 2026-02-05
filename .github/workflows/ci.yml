@@ -22,15 +22,16 @@ jobs:
       - name: Install CLI dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r cli/requirements.txt
+          pip install -r cli/Query_Builder/requirements.txt
+          pip install -r cli/CSRF_Scanner/requirements.txt
 
       - name: CLI help
         run: |
-          python cli/gql_path_query_builder.py -h
-
+          python cli/Query_Builder/gql_path_query_builder.py -h
+          python cli/CSRF_Scanner/CSRF-Checker.py -h
       - name: CLI smoke (example schema)
         run: |
-          python cli/gql_path_query_builder.py -s cli/examples/Schema.simple.json -t User -m burp -M 3 -n
+          python cli/Query_Builder/gql_path_query_builder.py -s cli/examples/Schema.simple.json -t User -m burp -M 3 -n
 
   burp-extension-build:
     runs-on: ubuntu-latest
