@@ -1,0 +1,22 @@
+# HTTP client with HTTP/2 support
+httpx[http2]>=0.27.0
+
+# Colored terminal output (Windows/Linux)
+colorama>=0.4.6
+
+# Optional / commonly used in security tooling
+requests>=2.31.0
+
+# URL and charset handling (often pulled transitively, but pinned for stability)
+charset-normalizer>=3.3.2
+idna>=3.6
+certifi>=2024.2.2
+
+# Async support (future-proof if you extend to async scanning)
+anyio>=4.2.0
+sniffio>=1.3.0
+
+# HTTP/2 dependency (explicit for clarity)
+h2>=4.1.0
+hpack>=4.0.0
+hyperframe>=6.0.1

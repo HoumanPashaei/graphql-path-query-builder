@@ -1,0 +1,20 @@
+POST /graphql/v1 HTTP/2
+Host: 0a89009c03767aff808903c1003f003d.web-security-academy.net
+Cookie: session=sEjqd1XidFhDzA4tJAY8EfwnPIGvFQlY; session=sEjqd1XidFhDzA4tJAY8EfwnPIGvFQlY
+Content-Length: 223
+Sec-Ch-Ua-Platform: "Windows"
+Accept-Language: en-US,en;q=0.9
+Accept: application/json
+Sec-Ch-Ua: "Not(A:Brand";v="8", "Chromium";v="144"
+Content-Type: application/json
+Sec-Ch-Ua-Mobile: ?0
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Origin: https://0a89009c03767aff808903c1003f003d.web-security-academy.net
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: https://0a89009c03767aff808903c1003f003d.web-security-academy.net/my-account
+Accept-Encoding: gzip, deflate, br
+Priority: u=1, i
+
+{"query":"\n    mutation changeEmail($input: ChangeEmailInput!) {\n        changeEmail(input: $input) {\n            email\n        }\n    }\n","operationName":"changeEmail","variables":{"input":{"email":"test@gmail.com"}}}
