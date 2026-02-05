@@ -31,7 +31,7 @@ jobs:
           python cli/CSRF_Scanner/CSRF-Checker.py -h
       - name: CLI smoke (example schema)
         run: |
-          python cli/Query_Builder/gql_path_query_builder.py -s cli/examples/Schema.simple.json -t User -m burp -M 3 -n
+          python cli/Query_Builder/gql_path_query_builder.py -s cli/Query_Builder/examples/Schema.simple.json -t User -m burp -M 3 -n
 
   burp-extension-build:
     runs-on: ubuntu-latest
