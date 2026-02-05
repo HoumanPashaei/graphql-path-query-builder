@@ -92,10 +92,10 @@ python gql_path_query_builder.py -s Schema.json -t User -b -o user_bundled.ndjso
 
 
 ### 1) Example of Paths-only output
-![Paths-only output](docs/images/paths-only.png)
+![Paths-only output](../../docs/images/paths-only.png)
 
 ### 2) Example of Path + generated query output
-![Path + generated query output](docs/images/path-and-query.png)
+![Path + generated query output](../../docs/images/path-and-query.png)
 
 > Tip: Keep screenshots readable by using `-m pretty` (default) for multi-line query display.
 
