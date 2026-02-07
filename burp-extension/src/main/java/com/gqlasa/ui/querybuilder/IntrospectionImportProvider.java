@@ -1,6 +1,7 @@
 package com.gqlasa.ui.querybuilder;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
@@ -9,10 +10,10 @@ import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
 import com.gqlasa.model.GeneralConfig;
 import com.gqlasa.model.HeaderKV;
 import com.gqlasa.ui.MainPanel;
-import com.gqlasa.ui.querybuilder.QueryBuilderPanel;
 
 import javax.swing.*;
 import java.awt.*;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,86 +28,141 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
 
     @Override
     public List<Component> provideMenuItems(ContextMenuEvent event) {
+        HttpRequestResponse rr = pickOneRequestResponse(event);
+        if (rr == null) return List.of();
+
+        final HttpRequestResponse rrFinal = rr;
+
+        JMenuItem sendToQB = new JMenuItem("Send to QueryBuilder");
+        sendToQB.addActionListener(e -> sendToQueryBuilder(rrFinal));
+
+        JMenuItem sendToCsrf = new JMenuItem("Send to CSRF Scanner");
+        sendToCsrf.addActionListener(e -> sendToCsrfScanner(rrFinal));
+
+        JMenu root = new JMenu("GQL-ASA");
+        root.add(sendToQB);
+        root.add(sendToCsrf);
+
+        return List.of((Component) root);
+    }
+
+    private HttpRequestResponse pickOneRequestResponse(ContextMenuEvent event) {
         // Prefer editor context (Repeater/Intruder/etc), fallback to selection (Proxy/HTTP history)
         var rrOpt = event.messageEditorRequestResponse();
         var selected = event.selectedRequestResponses();
 
-        burp.api.montoya.http.message.HttpRequestResponse rr = null;
         if (rrOpt.isPresent()) {
-            rr = rrOpt.get().requestResponse();
-        } else if (selected != null && !selected.isEmpty()) {
-            rr = selected.get(0);
+            return rrOpt.get().requestResponse();
         }
-
-        if (rr == null) {
-            return java.util.List.of();
+        if (selected != null && !selected.isEmpty()) {
+            return selected.get(0);
         }
+        return null;
+    }
 
-        final var rrFinal = rr;
+    private void sendToQueryBuilder(HttpRequestResponse rr) {
+        HttpRequest req = rr.request();
+        HttpResponse resp = rr.response();
 
-        JMenuItem item = new JMenuItem("Send to QueryBuilder");
-        item.addActionListener(e -> {
-            HttpRequest req = rrFinal.request();
-            HttpResponse resp = rrFinal.response();
-
-            // If no response is available, try sending the request
-            if (resp == null) {
-                try {
-                    var sent = api.http().sendRequest(req);
-                    resp = sent.response();
-                } catch (Exception ignored) { }
-            }
-
-            String schemaJson = resp != null ? resp.bodyToString() : "";
-
-            GeneralConfig cfg = new GeneralConfig();
+        // If no response is available, try sending the request
+        if (resp == null) {
             try {
-                URI uri = URI.create(req.url());
-                cfg.scheme = uri.getScheme() == null ? "https" : uri.getScheme();
-                cfg.host = uri.getHost() == null ? "" : uri.getHost();
-                int p = uri.getPort();
-                cfg.port = (p == -1)
-                        ? ("https".equalsIgnoreCase(cfg.scheme) ? 443 : 80)
-                        : p;
-                cfg.endpointPath = uri.getPath() == null ? "/" : uri.getPath();
-            } catch (Exception ex) {
-                cfg.scheme = "https";
-                cfg.host = "";
-                cfg.port = 443;
-                cfg.endpointPath = "/graphql";
+                var sent = api.http().sendRequest(req);
+                resp = sent.response();
+            } catch (Exception ignored) {
             }
+        }
 
-            cfg.method = "POST";
+        String schemaJson = (resp != null) ? resp.bodyToString() : "";
 
-            // content-type from request headers (default json)
-            String ct = req.headerValue("Content-Type");
-            cfg.contentType = (ct == null || ct.isBlank()) ? "application/json" : ct;
+        GeneralConfig cfg = new GeneralConfig();
+        try {
+            URI uri = URI.create(req.url());
+            cfg.scheme = (uri.getScheme() == null) ? "https" : uri.getScheme();
+            cfg.host = (uri.getHost() == null) ? "" : uri.getHost();
 
-            // copy relevant headers
-            List<HeaderKV> hdrs = new ArrayList<>();
-            for (var h : req.headers()) {
-                String name = h.name();
-                if (name == null) continue;
-                String n = name.toLowerCase();
-                if (n.equals("host") || n.equals("content-length")) continue;
-                if (n.equals("connection")) continue;
-                hdrs.add(new HeaderKV(name, h.value()));
+            int p = uri.getPort();
+            cfg.port = (p == -1)
+                    ? ("https".equalsIgnoreCase(cfg.scheme) ? 443 : 80)
+                    : p;
+
+            cfg.endpointPath = (uri.getPath() == null || uri.getPath().isBlank()) ? "/" : uri.getPath();
+        } catch (Exception ex) {
+            cfg.scheme = "https";
+            cfg.host = "";
+            cfg.port = 443;
+            cfg.endpointPath = "/graphql";
+        }
+
+        cfg.method = "POST";
+
+        // content-type from request headers (default json)
+        String ct = req.headerValue("Content-Type");
+        cfg.contentType = (ct == null || ct.isBlank()) ? "application/json" : ct;
+
+        // copy headers
+        List<HeaderKV> hdrs = new ArrayList<>();
+        for (var h : req.headers()) {
+            String name = h.name();
+            if (name == null) continue;
+            String n = name.toLowerCase();
+
+            if (n.equals("host") || n.equals("content-length")) continue;
+            if (n.equals("connection")) continue;
+
+            hdrs.add(new HeaderKV(name, h.value()));
+        }
+        cfg.headers = hdrs;
+
+        // Apply into UI and switch to Paths→Queries
+        MainPanel mp = MainPanel.getInstance();
+        if (mp != null) {
+            mp.selectQueryBuilder();
+            QueryBuilderPanel qb = QueryBuilderPanel.getInstance();
+            if (qb != null) {
+                qb.applyImportedIntrospection(cfg, schemaJson, true);
             }
-            cfg.headers = hdrs;
+        }
+    }
 
-            // Apply into UI and switch to Paths→Queries
+    /**
+     * CSRF Scanner hook.
+     * برای اینکه QueryBuilder هیچ‌وقت با تغییرات CSRF نشکند، این قسمت را با Reflection زده‌ایم:
+     * اگر تب/کلاس CSRF وجود داشته باشد، اجرا می‌شود؛ اگر وجود نداشت، هیچ اتفاقی نمی‌افتد.
+     */
+    private void sendToCsrfScanner(HttpRequestResponse rr) {
+        try {
             MainPanel mp = MainPanel.getInstance();
             if (mp != null) {
-                mp.selectQueryBuilder();
-                QueryBuilderPanel qb = QueryBuilderPanel.getInstance();
-                if (qb != null) {
-                    qb.applyImportedIntrospection(cfg, schemaJson, true);
-                }
+                // mp.selectCsrfScanner() اگر وجود داشت
+                tryInvoke(mp, "selectCsrfScanner");
             }
-        });
 
-        JMenu menu = new JMenu("GQL-ASA");
-        menu.add(item);
-        return java.util.List.of((Component) menu);
+            Class<?> panelClazz = Class.forName("com.gqlasa.ui.csrf.CsrfScannerPanel");
+            Method getInstance = panelClazz.getMethod("getInstance");
+            Object panel = getInstance.invoke(null);
+
+            if (panel != null) {
+                // panel.importFromHttpRequestResponse(HttpRequestResponse) اگر وجود داشت
+                tryInvoke(panel, "importFromHttpRequestResponse", HttpRequestResponse.class, rr);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void tryInvoke(Object target, String methodName, Class<?>... paramTypes) {
+        try {
+            Method m = target.getClass().getMethod(methodName, paramTypes);
+            m.invoke(target, new Object[paramTypes.length]);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void tryInvoke(Object target, String methodName, Class<?> paramType, Object arg) {
+        try {
+            Method m = target.getClass().getMethod(methodName, paramType);
+            m.invoke(target, arg);
+        } catch (Exception ignored) {
+        }
     }
 }
