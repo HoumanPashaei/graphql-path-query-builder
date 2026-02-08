@@ -2,6 +2,7 @@ package com.gqlasa.util;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -49,6 +50,32 @@ public final class Json {
             return MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
             return String.valueOf(obj);
+        }
+    }
+
+    /**
+     * Backwards-compatible alias used by some panels.
+     */
+    public static String stringify(Map<String, Object> map) {
+        return compact(map);
+    }
+
+    /**
+     * Backwards-compatible alias used by some panels.
+     */
+    public static String stringify(List<Map<String, Object>> list) {
+        return compact(list);
+    }
+
+    /**
+     * Parse arbitrary JSON into Map/List/scalars.
+     */
+    public static Object parse(String json) {
+        try {
+            if (json == null) return null;
+            return MAPPER.readValue(json, new TypeReference<Object>() {});
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

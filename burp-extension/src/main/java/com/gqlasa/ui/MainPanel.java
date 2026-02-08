@@ -2,6 +2,7 @@ package com.gqlasa.ui;
 
 import com.gqlasa.ui.querybuilder.QueryBuilderPanel;
 import com.gqlasa.ui.csrf.CsrfScannerPanel;
+import com.gqlasa.ui.dos.DosScannerPanel;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,6 +14,7 @@ public class MainPanel extends JPanel {
     private final JTabbedPane tabs;
     private final QueryBuilderPanel queryBuilderPanel;
     private final CsrfScannerPanel csrfScannerPanel;
+    private final DosScannerPanel dosScannerPanel;
 
     public MainPanel() {
         super(new BorderLayout());
@@ -21,10 +23,11 @@ public class MainPanel extends JPanel {
         tabs = new JTabbedPane();
         queryBuilderPanel = new QueryBuilderPanel();
         csrfScannerPanel = new CsrfScannerPanel();
+        dosScannerPanel = new DosScannerPanel();
 
         tabs.addTab("Query Builder", queryBuilderPanel);
         tabs.addTab("CSRF Scanner", csrfScannerPanel);
-        tabs.addTab("DoS (GraphQL Cop)", placeholder("Planned"));
+        tabs.addTab("DoS Scanner", dosScannerPanel);
         tabs.addTab("CSWS Hijacking", placeholder("Planned"));
 
         add(tabs, BorderLayout.CENTER);
@@ -50,6 +53,15 @@ public class MainPanel extends JPanel {
 
     public CsrfScannerPanel csrfScanner() {
         return csrfScannerPanel;
+    }
+
+
+    public void selectDosScanner() {
+        SwingUtilities.invokeLater(() -> tabs.setSelectedIndex(2));
+    }
+
+    public DosScannerPanel dosScanner() {
+        return dosScannerPanel;
     }
 
 

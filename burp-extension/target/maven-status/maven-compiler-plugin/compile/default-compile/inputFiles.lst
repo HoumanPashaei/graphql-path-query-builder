@@ -15,6 +15,7 @@ P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\s
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\model\HeaderKV.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\model\PathRow.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\csrf\CsrfScannerPanel.java
+P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\dos\DosScannerPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\MainPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\GeneralConfigPanel.java
 P:\Privacy\Security Concepts\GraphQL\graphql-path-query-builder\burp-extension\src\main\java\com\gqlasa\ui\querybuilder\HeadersTableModel.java

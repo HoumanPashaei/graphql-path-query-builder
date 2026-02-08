@@ -39,9 +39,13 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
         JMenuItem sendToCsrf = new JMenuItem("Send to CSRF Scanner");
         sendToCsrf.addActionListener(e -> sendToCsrfScanner(rrFinal));
 
+        JMenuItem sendToDos = new JMenuItem("Send to DoS Scanner");
+        sendToDos.addActionListener(e -> sendToDosScanner(rrFinal));
+
         JMenu root = new JMenu("GQL-ASA");
         root.add(sendToQB);
         root.add(sendToCsrf);
+        root.add(sendToDos);
 
         return List.of((Component) root);
     }
@@ -125,7 +129,31 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
         }
     }
 
+    
     /**
+     * DoS (GraphQL Cop) hook.
+     * مشابه CSRF، با Reflection تا در صورت نبودن کلاس/تب، افزونه نشکند.
+     */
+    private void sendToDosScanner(HttpRequestResponse rr) {
+        try {
+            MainPanel mp = MainPanel.getInstance();
+            if (mp != null) {
+                // تلاش برای انتخاب تب DoS در صورت وجود
+                tryInvoke(mp, "selectDosScanner");
+            }
+
+            Class<?> panelClazz = Class.forName("com.gqlasa.ui.dos.DosScannerPanel");
+            Method getInstance = panelClazz.getMethod("getInstance");
+            Object panel = getInstance.invoke(null);
+
+            if (panel != null) {
+                tryInvoke(panel, "importFromHttpRequestResponse", HttpRequestResponse.class, rr);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+/**
      * CSRF Scanner hook.
      * برای اینکه QueryBuilder هیچ‌وقت با تغییرات CSRF نشکند، این قسمت را با Reflection زده‌ایم:
      * اگر تب/کلاس CSRF وجود داشته باشد، اجرا می‌شود؛ اگر وجود نداشت، هیچ اتفاقی نمی‌افتد.
