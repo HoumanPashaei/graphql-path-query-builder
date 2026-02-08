@@ -23,7 +23,6 @@ public class MainPanel extends JPanel {
         csrfScannerPanel = new CsrfScannerPanel();
 
         tabs.addTab("Query Builder", queryBuilderPanel);
-        tabs.addTab("Voyager", placeholder("Planned"));
         tabs.addTab("CSRF Scanner", csrfScannerPanel);
         tabs.addTab("DoS (GraphQL Cop)", placeholder("Planned"));
         tabs.addTab("CSWS Hijacking", placeholder("Planned"));
@@ -46,7 +45,7 @@ public class MainPanel extends JPanel {
 
 
     public void selectCsrfScanner() {
-        SwingUtilities.invokeLater(() -> tabs.setSelectedIndex(2));
+        SwingUtilities.invokeLater(() -> tabs.setSelectedIndex(1));
     }
 
     public CsrfScannerPanel csrfScanner() {

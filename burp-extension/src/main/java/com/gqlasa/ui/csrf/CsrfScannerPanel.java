@@ -669,15 +669,6 @@ public class CsrfScannerPanel extends JPanel {
                     btnStop.setEnabled(false);
                     stopRequested.set(false);
 
-                    // Ensure pagination starts with the most interesting results.
-                    // This reorders the underlying model (paging is based on model order).
-                    try {
-                        model.sortPotentialYesFirst();
-                    } catch (Exception ignore) {
-                        // ignore
-                    }
-
-
                     // Default sort: Potential CSRF (Yes first)
                     try {
                         sorter.setSortKeys(java.util.List.of(new javax.swing.RowSorter.SortKey(4, javax.swing.SortOrder.DESCENDING)));
@@ -1138,6 +1129,7 @@ public class CsrfScannerPanel extends JPanel {
         }
 
         String scenario = esc(r.variant);
+        String mode = esc(r.mode);
         String potential = esc(r.potential);
         String notes = esc(r.notes);
 
@@ -1182,6 +1174,7 @@ public class CsrfScannerPanel extends JPanel {
                 "</style></head><body>" +
                 "<div class='section'><h3>Attack explanation</h3>" +
                 "<p><b>Scenario:</b> " + scenario + "</p>" +
+                "<p><b>Mode:</b> " + mode + "</p>" +
                 "</div>" +
                 baselineCmp +
                 "<div class='section'><h3>Reason</h3>" +
@@ -1305,19 +1298,6 @@ public class CsrfScannerPanel extends JPanel {
         boolean isPotentialYes(int modelRow) {
             Row r = getRow(modelRow);
             return r != null && "Yes".equalsIgnoreCase(r.potential);
-        }
-
-        void sortPotentialYesFirst() {
-            // Keep baseline rows on top, then Potential=Yes rows, then the rest.
-            rows.sort((a, b) -> {
-                if (a.isBaseline != b.isBaseline) return a.isBaseline ? -1 : 1;
-                boolean aYes = "Yes".equalsIgnoreCase(a.potential);
-                boolean bYes = "Yes".equalsIgnoreCase(b.potential);
-                if (aYes != bYes) return aYes ? -1 : 1;
-                // Stable-ish secondary: keep original index order.
-                return Integer.compare(a.index, b.index);
-            });
-            fireTableDataChanged();
         }
 
         @Override
