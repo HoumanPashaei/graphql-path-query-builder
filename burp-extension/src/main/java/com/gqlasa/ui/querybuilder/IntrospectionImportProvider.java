@@ -2,8 +2,10 @@ package com.gqlasa.ui.querybuilder;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.http.message.HttpHeader;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
+import burp.api.montoya.core.ByteArray;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
 
@@ -14,11 +16,21 @@ import com.gqlasa.ui.MainPanel;
 import javax.swing.*;
 import java.awt.*;
 import java.lang.reflect.Method;
-import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class IntrospectionImportProvider implements ContextMenuItemsProvider {
+
+    // Introspection query used across the extension (matches DoS Scanner's fetch logic).
+    // Kept as a single line to avoid any JSON escaping/transport edge cases.
+    private static final String INTROSPECTION_QUERY =
+            "query IntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } " +
+            "fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } " +
+            "fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } " +
+            "fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } }";
 
     private final MontoyaApi api;
 
@@ -77,20 +89,44 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
             }
         }
 
-        String schemaJson = (resp != null) ? resp.bodyToString() : "";
+        String bodyText = safeBodyToString(req);
+        boolean looksLikeIntrospectionRequest = bodyText.contains("__schema") || bodyText.contains("IntrospectionQuery");
 
+        // Do NOT blindly put the response body into the Schema tab.
+        // Only accept actual introspection responses (contain __schema).
+        String responseBody = (resp != null) ? resp.bodyToString() : "";
+        boolean looksLikeSchemaResponse = responseBody != null && (responseBody.contains("\"__schema\"") || responseBody.contains("__schema"));
+
+        String schemaJson = "";
+        boolean schemaLoaded = false;
+
+        // Build target config from the request's HttpService/path.
+        // (Avoid reflection here; Montoya exposes host()/port()/secure() directly and
+        // reflection mistakes can silently break auto-introspection.)
         GeneralConfig cfg = new GeneralConfig();
         try {
-            URI uri = URI.create(req.url());
-            cfg.scheme = (uri.getScheme() == null) ? "https" : uri.getScheme();
-            cfg.host = (uri.getHost() == null) ? "" : uri.getHost();
+            var svc = req.httpService();
+            // Prefer the raw Host header (may include port), because some apps
+            // and reverse proxies route based on the Host header value.
+            String hostHeader = null;
+            try { hostHeader = req.headerValue("Host"); } catch (Exception ignored) {}
+            cfg.host = (hostHeader != null && !hostHeader.isBlank())
+                    ? hostHeader.trim()
+                    : ((svc == null) ? "" : svc.host());
+            cfg.port = (svc == null) ? 443 : svc.port();
+            cfg.scheme = (svc != null && svc.secure()) ? "https" : "http";
 
-            int p = uri.getPort();
-            cfg.port = (p == -1)
-                    ? ("https".equalsIgnoreCase(cfg.scheme) ? 443 : 80)
-                    : p;
-
-            cfg.endpointPath = (uri.getPath() == null || uri.getPath().isBlank()) ? "/" : uri.getPath();
+            String path = null;
+            try { path = req.path(); } catch (Exception ignored) {}
+            if (path == null || path.isBlank()) {
+                // Fallback: parse request line
+                String raw = req.toString();
+                int eol = raw.indexOf("\r\n");
+                String first = eol > 0 ? raw.substring(0, eol) : raw;
+                String[] parts = first.split(" ");
+                if (parts.length >= 2) path = parts[1];
+            }
+            cfg.endpointPath = (path == null || path.isBlank()) ? "/graphql" : path;
         } catch (Exception ex) {
             cfg.scheme = "https";
             cfg.host = "";
@@ -118,6 +154,30 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
         }
         cfg.headers = hdrs;
 
+        if (looksLikeSchemaResponse) {
+            // User already provided an introspection response (e.g., from Repeater).
+            schemaJson = responseBody;
+            schemaLoaded = true;
+        } else if (looksLikeIntrospectionRequest) {
+            // User provided an introspection request but without a response.
+            // Fetch it ourselves using a fresh request with correct framing.
+            try {
+                String fetched = tryFetchIntrospection(req, cfg);
+                if (fetched != null && (fetched.contains("\"__schema\"") || fetched.contains("__schema"))) {
+                    schemaJson = fetched;
+                    schemaLoaded = true;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // We intentionally do NOT auto-introspect for normal GraphQL queries.
+        // If the user wants schema loaded automatically, they can send an
+        // introspection request/response from Repeater, or import schema JSON.
+        com.gqlasa.model.AppState.get().schemaAutoFetchFailed = !schemaLoaded;
+        com.gqlasa.model.AppState.get().schemaAutoFetchMessage = schemaLoaded
+                ? ""
+                : "Schema: not loaded (please import schema JSON or send an introspection response)";
+
         // Apply into UI and switch to Paths→Queries
         MainPanel mp = MainPanel.getInstance();
         if (mp != null) {
@@ -127,6 +187,66 @@ public class IntrospectionImportProvider implements ContextMenuItemsProvider {
                 qb.applyImportedIntrospection(cfg, schemaJson, true);
             }
         }
+    }
+
+    private String safeBodyToString(HttpRequest req) {
+        try {
+            String s = req.bodyToString();
+            return s == null ? "" : s;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String tryFetchIntrospection(HttpRequest baseReq, GeneralConfig cfg) {
+        if (baseReq == null) return null;
+
+        // IMPORTANT:
+        // We previously tried to reuse the original request and only swap the body.
+        // In practice, some Montoya/Burp combinations keep stale framing/length or
+        // normalize headers differently, which can cause the server to reject the body
+        // or the request to never reach the intended endpoint.
+        //
+        // To behave like Repeater (where introspection works for the user), we build
+        // a fresh raw HTTP request string with correct Content-Length using the same
+        // target HttpService, then send it via Montoya.
+        try {
+            cfg.contentType = "application/json";
+        } catch (Exception ignored) {}
+
+        com.gqlasa.model.BuiltQuery iq = new com.gqlasa.model.BuiltQuery();
+        iq.query = INTROSPECTION_QUERY;
+        iq.operationName = "IntrospectionQuery";
+        iq.variables = new LinkedHashMap<>();
+
+        String raw = com.gqlasa.core.BurpRequestBuilder.buildHttpRequest(cfg, iq);
+        HttpRequest iReq = HttpRequest.httpRequest(baseReq.httpService(), raw);
+
+        var rr = api.http().sendRequest(iReq);
+        if (rr == null || rr.response() == null) return null;
+        String body = rr.response().bodyToString();
+        // Helpful diagnostics for cases where users can fetch schema in Repeater
+        // but auto-fetch fails (e.g., WAF rules, auth issues, blocked headers).
+        if (body == null || body.isBlank() || !(body.contains("__schema") || body.contains("\"__schema\""))) {
+            try {
+                int sc = rr.response().statusCode();
+                api.logging().logToOutput("[QueryBuilder] Auto-introspection did not return schema. HTTP=" + sc);
+                String snippet = body == null ? "" : body;
+                if (snippet.length() > 300) snippet = snippet.substring(0, 300);
+                if (!snippet.isBlank()) api.logging().logToOutput("[QueryBuilder] Introspection response snippet: " + snippet);
+                com.gqlasa.model.AppState.get().schemaAutoFetchMessage = "Schema: not loaded (introspection failed — HTTP=" + sc + ")";
+            } catch (Exception ignored) {}
+        }
+        return body;
+    }
+
+    // kept for backward compatibility if used elsewhere in future; currently unused
+    @SuppressWarnings("unused")
+    private boolean needsPort(GeneralConfig cfg) {
+        if (cfg == null) return true;
+        if ("https".equalsIgnoreCase(cfg.scheme)) return cfg.port != 443;
+        if ("http".equalsIgnoreCase(cfg.scheme)) return cfg.port != 80;
+        return true;
     }
 
     

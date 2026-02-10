@@ -127,7 +127,8 @@ public class SchemaPanel extends JPanel {
         SwingWorker<String, Void> worker = new SwingWorker<>() {
             @Override protected String doInBackground() {
                 try {
-                    Object node = Json.MAPPER.readTree(current);
+                    Object node = Json.parse(current);
+                    if (node == null) return current;
                     return Json.toPrettyString(node);
                 } catch (Exception e) {
                     return current;
@@ -167,9 +168,21 @@ public class SchemaPanel extends JPanel {
     private void refreshStatusAsync() {
         String schemaJson = AppState.get().schemaJson;
         if (schemaJson == null || schemaJson.trim().isEmpty()) {
-            status.setText("Schema: not loaded");
+            AppState st = AppState.get();
+            if (st.schemaAutoFetchFailed) {
+                String msg = (st.schemaAutoFetchMessage == null || st.schemaAutoFetchMessage.isBlank())
+                        ? "Schema: not loaded (introspection failed — please import schema)"
+                        : st.schemaAutoFetchMessage;
+                status.setText(msg);
+            } else {
+                status.setText("Schema: not loaded");
+            }
             return;
         }
+
+        // Clear any previous auto-fetch error once we have schema content
+        AppState.get().schemaAutoFetchFailed = false;
+        AppState.get().schemaAutoFetchMessage = "";
 
         if (validatorWorker != null && !validatorWorker.isDone()) {
             validatorWorker.cancel(true);
@@ -203,6 +216,16 @@ public class SchemaPanel extends JPanel {
 
 
     public void loadSchemaFromState() {
-        schemaArea.setText(com.gqlasa.model.AppState.get().schemaJson == null ? "" : com.gqlasa.model.AppState.get().schemaJson);
+        // When schema is injected programmatically (auto-introspection), we want the UI
+        // to reflect it immediately without relying on debounce/document events.
+        String s = com.gqlasa.model.AppState.get().schemaJson;
+        suppressDocEvents = true;
+        try {
+            schemaArea.setText(s == null ? "" : s);
+            schemaArea.setCaretPosition(0);
+        } finally {
+            suppressDocEvents = false;
+        }
+        applySchemaToState(schemaArea.getText());
     }
 }

@@ -75,11 +75,14 @@ public class DosScannerPanel extends JPanel {
     private JButton btnNext;
     private JLabel pageLabel;
     private int currentPage = 1;
-    private boolean sortPotentialDesc = true;
+    // Sorting toggles
+    private boolean sortVulnerableDesc = true;
 
     private HttpRequestEditor reqEd;
     private HttpResponseEditor resEd;
 
+    // Details panes were removed from the Scanner tab in favor of the Attack Guide.
+    // We keep per-row HTML (Row.detailsHtml) for possible future use (e.g., export) but we do not render it in Scanner.
     private JEditorPane detailsPane;
     private JEditorPane examplePane;
 
@@ -94,6 +97,7 @@ public class DosScannerPanel extends JPanel {
     private volatile long baselineTimeMs = -1;
 
     private final AtomicBoolean stopRequested = new AtomicBoolean(false);
+    private volatile boolean scanRunning = false;
     private volatile ExecutorService pool;
 
     private final Options opt = new Options();
@@ -109,8 +113,275 @@ public class DosScannerPanel extends JPanel {
 
         mainTabs.addTab("Schema", buildSchemaTabPanel());
         mainTabs.addTab("Scanner", buildScannerTabPanel());
+        mainTabs.addTab("Attack Guide", buildGuideTabPanel());
 
         add(mainTabs, BorderLayout.CENTER);
+    }
+
+    // ---------------------------
+    // UI: Attack Guide tab
+    // ---------------------------
+
+    private static final class GuideScenario {
+        final String title;
+        final String what;
+        final String why;
+        final String detection;
+        final String mitigations;
+        final String notes;
+        final String example;
+
+        GuideScenario(String title, String what, String why, String detection, String example, String mitigations, String notes) {
+            this.title = title;
+            this.what = what;
+            this.why = why;
+            this.detection = detection;
+            this.example = example;
+            this.mitigations = mitigations;
+            this.notes = notes;
+        }
+    }
+
+    private JPanel buildGuideTabPanel() {
+        List<GuideScenario> scenarios = buildGuideScenarios();
+
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+        root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+        JLabel title = new JLabel();
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 14f));
+        JLabel counter = new JLabel();
+        counter.setForeground(Color.DARK_GRAY);
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.add(title, BorderLayout.WEST);
+        header.add(counter, BorderLayout.EAST);
+        root.add(header, BorderLayout.NORTH);
+
+        CardLayout cards = new CardLayout();
+        JPanel cardPanel = new JPanel(cards);
+
+        // We keep references so we can update scroll positions on page change.
+        List<JEditorPane> htmlPanes = new ArrayList<>();
+        List<JTextArea> codeAreas = new ArrayList<>();
+
+        for (int i = 0; i < scenarios.size(); i++) {
+            GuideScenario s = scenarios.get(i);
+
+            JEditorPane body = new JEditorPane("text/html", "");
+            body.setEditable(false);
+            body.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true);
+            body.setText(buildScenarioHtml(s));
+            body.setCaretPosition(0);
+
+            JTextArea code = new JTextArea(s.example == null ? "" : s.example);
+            code.setEditable(false);
+            code.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+            code.setLineWrap(true);
+            code.setWrapStyleWord(true);
+            code.setCaretPosition(0);
+
+            JScrollPane bodyScroll = new JScrollPane(body);
+            bodyScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            JScrollPane codeScroll = new JScrollPane(code);
+            codeScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+
+            JPanel codeWrap = new JPanel(new BorderLayout());
+            codeWrap.setBorder(BorderFactory.createTitledBorder("Full Example"));
+            codeWrap.add(codeScroll, BorderLayout.CENTER);
+
+            JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, bodyScroll, codeWrap);
+            split.setResizeWeight(0.70);
+
+            JPanel page = new JPanel(new BorderLayout());
+            page.add(split, BorderLayout.CENTER);
+
+            cardPanel.add(page, String.valueOf(i));
+            htmlPanes.add(body);
+            codeAreas.add(code);
+        }
+
+        root.add(cardPanel, BorderLayout.CENTER);
+
+        JButton prev = new JButton("Prev");
+        JButton next = new JButton("Next");
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        footer.add(prev);
+        footer.add(next);
+        root.add(footer, BorderLayout.SOUTH);
+
+        final int[] idx = new int[]{0};
+
+        Runnable refresh = () -> {
+            int i = idx[0];
+            GuideScenario s = scenarios.get(i);
+            title.setText(s.title);
+            counter.setText((i + 1) + "/" + scenarios.size());
+            cards.show(cardPanel, String.valueOf(i));
+            prev.setEnabled(i > 0);
+            next.setEnabled(i < scenarios.size() - 1);
+            // reset scroll positions
+            SwingUtilities.invokeLater(() -> {
+                try { htmlPanes.get(i).setCaretPosition(0); } catch (Exception ignored) {}
+                try { codeAreas.get(i).setCaretPosition(0); } catch (Exception ignored) {}
+            });
+        };
+
+        prev.addActionListener(e -> { if (idx[0] > 0) { idx[0]--; refresh.run(); }});
+        next.addActionListener(e -> { if (idx[0] < scenarios.size() - 1) { idx[0]++; refresh.run(); }});
+
+        refresh.run();
+        return root;
+    }
+
+    private String buildScenarioHtml(GuideScenario s) {
+        return """
+                <html><body style='font-family:Segoe UI, Arial; font-size:12px; line-height:1.45'>
+                <p><b>What is it</b><br/>%s</p>
+                <p><b>Why it’s vulnerable</b><br/>%s</p>
+                <p><b>Detection in this tool</b><br/>%s</p>
+                <p><b>Mitigations</b><br/>%s</p>
+                <p><b>Notes / pitfalls</b><br/>%s</p>
+                </body></html>
+                """.formatted(escBr(s.title), escBr(s.what), escBr(s.why), escBr(s.detection), escBr(s.mitigations), escBr(s.notes));
+    }
+
+    private static String escBr(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>");
+    }
+
+    private List<GuideScenario> buildGuideScenarios() {
+        List<GuideScenario> out = new ArrayList<>();
+
+        out.add(new GuideScenario(
+                "How to interpret results",
+                "This tab documents the scenarios tested by DoS Scanner and how to read the table.",
+                "GraphQL DoS often depends on both (1) what the server allows (missing limits) and (2) real impact (latency/timeouts). A fast environment can hide impact.",
+                "Table columns: \n• Vulnerable = Yes/Maybe/No (capability)\n• Severity = INFO/LOW/MEDIUM/HIGH (scenario-aware, based on magnitude and impact)\n• Reason explains the decision (accepted threshold, blocked by limit, invalid query, etc.)\n• ΔTime vs Baseline helps compare to normal request latency.",
+                "--",
+                "Use server-side protections: depth & complexity/cost limits, max aliases/fields/directives/fragments, request size limits, batch limits, rate limiting, disable introspection in prod, persisted queries.",
+                "Vulnerable=Maybe typically means the result is inconclusive (invalid query due to missing schema, non-JSON response, ambiguous errors)."));
+
+        out.add(new GuideScenario(
+                "Alias Overloading (DoS)",
+                "GraphQL aliases allow multiple occurrences of the same field in a single operation by renaming each occurrence.",
+                "If the server does not cap alias count/cost, a single request can trigger many resolver executions and expensive backend work.",
+                "We generate queries with increasing alias counts and mark Vulnerable=Yes when the server accepts counts at/above the configured threshold without limit errors.",
+                "query AliasOverloading {\n  a01: user(id: 1) { id }\n  a02: user(id: 1) { id }\n  a03: user(id: 1) { id }\n  # ... repeat up to 100+ aliases\n}",
+                "Enforce query complexity/cost, cap max aliases/selection size, rate limit, cache safe queries, use persisted queries.",
+                "If schema is not loaded, the tool falls back to a safe field; for the best signal, load schema so the tool can choose valid fields."));
+
+        out.add(new GuideScenario(
+                "Array-based Query Batching (DoS)",
+                "Some servers accept a JSON array of GraphQL operations (batching).",
+                "Each element is executed independently. Without a batch size/cost cap, a single HTTP request can multiply load dramatically.",
+                "We send an array body with N operations. Vulnerable=Yes when the server accepts arrays at/above the threshold.",
+                "[\n  {\"query\":\"query { __typename }\"},\n  {\"query\":\"query { __typename }\"}\n  // ... repeated 10+ times\n]",
+                "Disable batching in production or enforce strict per-request limits (max operations, max total cost), plus global rate limiting.",
+                "Some frameworks return 400 with GraphQL errors; the tool may mark Maybe if acceptance is unclear."));
+
+        out.add(new GuideScenario(
+                "Field Duplication (DoS)",
+                "Repeating the same field many times inside the same selection set (without aliases).",
+                "Large selection sets increase parse/validation/planning cost. Some resolvers may also repeat work if the server does not deduplicate.",
+                "We repeat a field N times. Vulnerable=Yes when large counts are accepted without limit errors.",
+                "query FieldDuplication {\n  user(id: 1) {\n    id\n    id\n    id\n    # ... repeat\n  }\n}",
+                "Apply complexity/cost analysis, cap max selection size, cap max query size, validate/normalize duplicate selections.",
+                "Even if resolvers deduplicate, parsing/planning can still be abused at large sizes."));
+
+        out.add(new GuideScenario(
+                "Directives Overloading (DoS)",
+                "Overusing directives by duplicating them many times (e.g., @skip/@include or custom directives).",
+                "Directive parsing/validation and execution logic can be abused to consume CPU.",
+                "We attach many directives to the same field. Vulnerable=Yes when high counts are accepted.",
+                "query DirectivesOverloading($cond:Boolean!){\n  user(id:1) @skip(if:$cond) @skip(if:$cond) @skip(if:$cond) { id }\n}",
+                "Limit directive count, cost analysis, disable unnecessary directives, strict validation.",
+                "Some servers normalize directives; others may still spend time parsing repeated directives."));
+
+        out.add(new GuideScenario(
+                "Introspection Enabled (Info Leak)",
+                "Introspection exposes schema metadata (types/fields).",
+                "This is usually information leakage, but it also enables targeted DoS (heavy fields, deep types).",
+                "We run a minimal introspection query. Severity=INFO when enabled.",
+                "query Introspection { __schema { queryType { name } } }",
+                "Disable introspection in production or restrict it to authenticated/admin users; prefer allow-listed/persisted operations.",
+                "If introspection is disabled, schema-driven tests may be limited unless the user imports schema manually."));
+
+        out.add(new GuideScenario(
+                "Introspection-based Deep ofType Nesting (DoS)",
+                "A deeply nested introspection query (often repeating ofType) that traverses type metadata repeatedly.",
+                "Without depth/cost limits, introspection queries can become heavy.",
+                "We increase nesting depth. Vulnerable=Yes when deep nesting at/above threshold is accepted.",
+                "query IntrospectionNesting {\n  __schema {\n    types {\n      fields {\n        type {\n          ofType { ofType { ofType { name } } }\n        }\n      }\n    }\n  }\n}",
+                "Disable introspection in production; enforce depth/cost limits; cap recursive metadata traversal.",
+                "Some servers always allow introspection but enforce depth/cost. That should result in Vulnerable=No with a limit error."));
+
+        out.add(new GuideScenario(
+                "Query Depth / Nested Selection (DoS)",
+                "Deeply nested selections (e.g., user→friends→friends→...).",
+                "Deep nesting increases resolver fan-out and DB load, and can increase response size.",
+                "Schema-driven: we build a nested query using available object relationships. Vulnerable=Yes when deep depth is accepted.",
+                "query Deep {\n  user(id:1){\n    friends{\n      friends{\n        friends{ id }\n      }\n    }\n  }\n}",
+                "Enforce max query depth, cost analysis, pagination enforcement, and avoid unbounded recursive relationships.",
+                "Requires schema to reliably build valid deep paths."));
+
+        out.add(new GuideScenario(
+                "Fragment Explosion / Nested Fragments (DoS)",
+                "Using many fragments and nested fragment spreads to create a huge expanded query.",
+                "Parsing/validation and planning cost can grow rapidly after fragment expansion.",
+                "Schema-driven: we generate a query that uses many nested fragments. Vulnerable=Yes when large expansions are accepted.",
+                "query FragmentExplosion {\n  user(id:1){ ...F1 }\n}\nfragment F1 on User { id name ...F2 }\nfragment F2 on User { id name ...F3 }\n# ...",
+                "Limit fragment count and total expanded size, enforce max query size, cost analysis.",
+                "Some servers cache parsed documents; attackers can still vary whitespace/aliases to bypass caches."));
+
+        out.add(new GuideScenario(
+                "Argument / Variable Bomb (DoS)",
+                "Sending extremely large JSON variables payloads or oversized arguments.",
+                "Large request bodies increase JSON parsing, validation, and memory pressure.",
+                "We send variables payloads of increasing size. Vulnerable=Maybe/Yes depends on acceptance and configured thresholds.",
+                "POST body: {\"query\":\"query($x:String!){echo(x:$x)}\", \"variables\":{\"x\":\"AAAA... (very long)\"}}",
+                "Enforce request size limits, variable size limits, timeouts, rate limiting, and WAF limits.",
+                "Some targets return generic 413/400. The tool reports Reason + status code; interpret with server logs."));
+
+        out.add(new GuideScenario(
+                "List Size / Pagination Abuse (DoS)",
+                "Abusing pagination arguments (first/limit/pageSize) with huge values.",
+                "Large list fetches cause DB load, memory pressure, and slow responses.",
+                "Schema-driven: we detect list fields with pagination arguments and try oversized values. Vulnerable=Yes when large values are accepted.",
+                "query PaginationAbuse {\n  users(first:100000){ id }\n}",
+                "Enforce max page size, require pagination on lists, cap values server-side, and use cost analysis.",
+                "Requires schema to find list fields and their argument names."));
+
+        out.add(new GuideScenario(
+                "Heavy Objects / Expensive Fields (DoS)",
+                "Some fields/resolvers are inherently expensive (joins, aggregations, search).",
+                "Repeating expensive operations (aliases/batching) can DoS even if individual requests succeed.",
+                "Schema-driven: we rank candidate heavy fields and let the user select additional fields. We then probe them and look for high ΔTime/timeouts.",
+                "query Heavy {\n  expensiveField { id }\n}",
+                "Resolver optimization (dataloader), caching, timeouts, rate limiting, cost per field, avoid N+1, and cap fan-out.",
+                "Heavy detection is environment-dependent; prefer testing on realistic data volumes."));
+
+        out.add(new GuideScenario(
+                "Slow Resolver / Heavy Scalar (DoS)",
+                "Some GraphQL fields return scalars (String/Boolean/Int/etc.) but are backed by expensive resolvers (e.g., running OS commands, performing maintenance, generating reports). Even without nested selections, repeatedly calling such a field can exhaust server resources.",
+                "Because the resolver work happens server-side. If there are no controls like rate limiting, query cost analysis, or per-field execution limits, an attacker can amplify load by aliasing or batching the same expensive scalar field.",
+                "If schema is available, DoS Scanner will list likely expensive scalar fields (heuristic by name + root Query fields). Selecting a candidate runs a baseline call and an amplification call (aliases/batch). Vulnerable becomes Yes/Maybe depending on whether the server accepts the amplification and whether impact thresholds are exceeded.",
+                "query HeavyScalarBaseline {\n  systemUpdate\n}\n\n# Amplification with aliases\nquery HeavyScalarAmplify {\n  a1: systemUpdate\n  a2: systemUpdate\n  a3: systemUpdate\n  a4: systemUpdate\n  a5: systemUpdate\n}\n",
+                "Mitigate by (1) rate limiting and request throttling, (2) query cost / complexity limiting per operation, (3) per-field execution guards (timeouts/circuit breakers), (4) caching for expensive computations, (5) authz checks and disabling risky maintenance fields in production.",
+                "Pitfall: a fast dev environment can hide impact; test on realistic data and hardware. Also note that some servers return HTTP 200 with GraphQL errors—use both HTTP and GraphQL-level signals when validating."));
+
+
+        out.add(new GuideScenario(
+                "Baseline Amplification (DoS)",
+                "Repeating the baseline query many times (batching-style amplification).",
+                "Even normal queries can DoS when amplified. This helps compare protective controls.",
+                "We send a batch containing the baseline query repeated N times. High latency/timeouts indicate amplification risk.",
+                "[\n  {\"query\":\"<baseline>\"},\n  {\"query\":\"<baseline>\"}\n  // ...\n]",
+                "Disable batching or cap it; use cost analysis and rate limits.",
+                "This is an impact-driven check; use the Severity + Reason to interpret."));
+
+        return out;
     }
 
     public static DosScannerPanel getInstance() {
@@ -155,12 +426,19 @@ public class DosScannerPanel extends JPanel {
                 .supplyAsync(() -> tryFetchIntrospectionSchema(this.baselineRequest))
                 .whenCompleteAsync((schemaJson, ex) -> SwingUtilities.invokeLater(() -> {
                     try {
+                        if (ex != null) {
+                            api.logging().logToError("Introspection fetch failed: " + ex);
+                        }
                         if (ex == null && !isNullOrBlank(schemaJson)) {
                             schemaArea.setText(schemaJson);
                             schemaArea.setCaretPosition(0);
                             schemaStatus.setText("Schema loaded from introspection.");
                         } else {
-                            schemaStatus.setText("Introspection schema not available (continuing without schema).");
+                            if (ex != null) {
+                                schemaStatus.setText("Introspection failed (continuing without schema). See Burp error log.");
+                            } else {
+                                schemaStatus.setText("Introspection schema not available (continuing without schema).");
+                            }
                         }
                     } finally {
                         schemaProgress.setVisible(false);
@@ -186,12 +464,8 @@ public class DosScannerPanel extends JPanel {
         try {
             String introspectionQuery = "query IntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } }";
 
-            // Build JSON body
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("query", introspectionQuery);
-            payload.put("operationName", "IntrospectionQuery");
-            payload.put("variables", new LinkedHashMap<String, Object>());
-            String body = Json.stringify(payload);
+            // Build JSON body (do not rely on Jackson at runtime)
+            String body = buildJsonBody(introspectionQuery, "IntrospectionQuery", Map.of());
 
             HttpRequest req = updateBodyAndHeaders(baselineReq, body, "application/json");
             HttpRequestResponse rr = api.http().sendRequest(req);
@@ -199,19 +473,20 @@ public class DosScannerPanel extends JPanel {
             if (resp == null) return null;
 
             String text = resp.bodyToString();
-            if (isNullOrBlank(text)) return null;
-
-            // Try to pretty print JSON if it parses
-            try {
-                Object parsed = Json.parse(text);
-                if (parsed != null) {
-                    return Json.toPrettyString(parsed);
-                }
-            } catch (Exception ignored) {
+            if (isNullOrBlank(text)) {
+                api.logging().logToOutput("Introspection returned empty body. HTTP=" + resp.statusCode());
+                return null;
             }
+
+            if (resp.statusCode() != 200 || !(text.contains("\"__schema\"") || text.contains("__schema"))) {
+                api.logging().logToOutput("Introspection response did not contain __schema. HTTP=" + resp.statusCode());
+                return null;
+            }
+            if (isNullOrBlank(text)) return null;
 
             return text;
         } catch (Exception e) {
+            api.logging().logToError("Introspection fetch exception: " + e);
             return null;
         }
     }
@@ -396,7 +671,9 @@ public class DosScannerPanel extends JPanel {
         try {
             int[] widths = new int[]{
                     55,   // Index
-                    80,   // Potential
+                    85,   // Vulnerable
+                    90,   // Severity
+                    260,  // Reason
                     220,  // Test
                     95,   // Status code
                     140,  // Response Time (ms)
@@ -415,14 +692,31 @@ public class DosScannerPanel extends JPanel {
         }
     }
 
-    private void sortAllRowsByPotential(boolean potentialYesFirst) {
+    private void sortAllRowsByVulnerable(boolean yesFirst) {
         allRows.sort((a, b) -> {
-            int pa = a.potential ? 1 : 0;
-            int pb = b.potential ? 1 : 0;
-            int cmp = Integer.compare(pa, pb);
-            if (potentialYesFirst) cmp = -cmp;
+            int sa = a.vulnerable == null ? 0 : a.vulnerable.score();
+            int sb = b.vulnerable == null ? 0 : b.vulnerable.score();
+            int cmp = Integer.compare(sa, sb);
+            if (yesFirst) cmp = -cmp; // desc
             if (cmp != 0) return cmp;
-            // Stable secondary order: newest first (higher index) to surface latest runs.
+            // tie-breaker: higher severity then newest
+            int scmp = Integer.compare(b.severityScore(), a.severityScore());
+            if (scmp != 0) return scmp;
+            return Integer.compare(b.index, a.index);
+        });
+    }
+
+    private void sortAllRowsBySeverity(boolean severityHighFirst) {
+        allRows.sort((a, b) -> {
+            int sa = a.severityScore();
+            int sb = b.severityScore();
+            int cmp = Integer.compare(sa, sb);
+            if (severityHighFirst) cmp = -cmp;
+            if (cmp != 0) return cmp;
+            // If same severity, prefer Vulnerable=Yes > Maybe > No.
+            int vcmp = Integer.compare(a.vulnerable == null ? 0 : a.vulnerable.score(), b.vulnerable == null ? 0 : b.vulnerable.score());
+            vcmp = -vcmp;
+            if (vcmp != 0) return vcmp;
             return Integer.compare(b.index, a.index);
         });
     }
@@ -459,9 +753,15 @@ public class DosScannerPanel extends JPanel {
         table.getTableHeader().addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 int col = table.columnAtPoint(e.getPoint());
-                if (col == 1) { // Potential
-                    sortPotentialDesc = !sortPotentialDesc;
-                    sortAllRowsByPotential(sortPotentialDesc);
+                if (col == 1) { // Vulnerable
+                    sortVulnerableDesc = !sortVulnerableDesc;
+                    sortAllRowsByVulnerable(sortVulnerableDesc);
+                    currentPage = 1;
+                    refreshPage();
+                } else if (col == 2) { // Severity
+                    // Reuse the same toggle for severity ordering.
+                    sortVulnerableDesc = !sortVulnerableDesc;
+                    sortAllRowsBySeverity(sortVulnerableDesc);
                     currentPage = 1;
                     refreshPage();
                 }
@@ -532,17 +832,6 @@ public class DosScannerPanel extends JPanel {
         tableWrap.add(tableScroll, BorderLayout.CENTER);
         tableWrap.add(pager, BorderLayout.SOUTH);
 
-        // Details tabs (two pages)
-        JTabbedPane detailsTabs = new JTabbedPane();
-        JScrollPane detailsScroll = new JScrollPane(detailsPane);
-        detailsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        JScrollPane exampleScroll = new JScrollPane(examplePane);
-        exampleScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        detailsTabs.addTab("<html><b>Details</b></html>", detailsScroll);
-        detailsTabs.addTab("<html><b>Example</b></html>", exampleScroll);
-        JPanel detailsWrap = wrapTitled(detailsTabs, "Details");
-        detailsWrap.setPreferredSize(new Dimension(420, 260));
-
         // Request/Response bottom
         Component reqUi = (reqEd == null) ? new JScrollPane(new JTextArea("Request viewer unavailable.")) : reqEd.uiComponent();
         Component resUi = (resEd == null) ? new JScrollPane(new JTextArea("Response viewer unavailable.")) : resEd.uiComponent();
@@ -550,11 +839,17 @@ public class DosScannerPanel extends JPanel {
         rr.add(wrapTitled(reqUi, "Request"));
         rr.add(wrapTitled(resUi, "Response"));
 
-        JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableWrap, detailsWrap);
-        topSplit.setResizeWeight(0.75);
-
-        JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topSplit, rr);
-        mainSplit.setResizeWeight(0.58);
+        // Scanner now focuses on results table + request/response. Explanations/examples are in the "Attack Guide" tab.
+        JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tableWrap, rr);
+        mainSplit.setResizeWeight(0.55);
+        rr.setMinimumSize(new Dimension(200, 260));
+        tableWrap.setMinimumSize(new Dimension(200, 220));
+        SwingUtilities.invokeLater(() -> {
+            try {
+                int h = mainSplit.getHeight();
+                if (h > 0) mainSplit.setDividerLocation((int)(h * 0.55));
+            } catch (Exception ignored) {}
+        });
 
         scannerRoot.add(mainSplit, BorderLayout.CENTER);
         return scannerRoot;
@@ -583,18 +878,24 @@ public class DosScannerPanel extends JPanel {
         btnStart.setEnabled(false);
         btnStop.setEnabled(true);
 
+        scanRunning = true;
         pool = Executors.newFixedThreadPool(opt.concurrency);
 
         CompletableFuture
                 .supplyAsync(this::sendBaseline, pool)
                 .thenRunAsync(this::runAllProbes, pool)
                 .whenCompleteAsync((v, ex) -> SwingUtilities.invokeLater(() -> {
+                    scanRunning = false;
                     btnStart.setEnabled(true);
                     btnStop.setEnabled(false);
                     shutdownPool();
 
                     if (ex != null) {
-                        finishedLabel.setText("Status: Finished (error)");
+                        String msg = ex.getMessage();
+                        if (msg == null) msg = ex.toString();
+                        finishedLabel.setText("Status: Finished (error) — " + msg);
+                        api.logging().logToError("DoS scan failed: " + ex);
+
                         finishedLabel.setBackground(new Color(255, 225, 225));
                         finishedLabel.setForeground(new Color(140, 0, 0));
                     } else if (stopRequested.get()) {
@@ -614,8 +915,22 @@ public class DosScannerPanel extends JPanel {
         if (stopRequested.get()) return;
 
         ParsedGraphql pg = parseGraphqlFromRequest(baselineRequest);
-        String firstField = guessFirstField(pg.query);
-        if (firstField == null) firstField = "__typename";
+        String baseQuery = pg.query;
+        if (isNullOrBlank(baseQuery)) {
+            // Some targets send raw GraphQL or non-JSON bodies; fall back to a minimal selection.
+            baseQuery = "{ __typename }";
+        }
+
+        // Prefer schema-derived root field if schema is available. This prevents invalid probes when the
+        // imported request is introspection or uses a field that doesn't exist on the target.
+        String firstField = null;
+        if (schemaModel != null) {
+            firstField = schemaModel.pickDefaultQueryFieldName();
+        }
+        if (isNullOrBlank(firstField)) {
+            firstField = guessFirstField(baseQuery);
+        }
+        if (isNullOrBlank(firstField)) firstField = "__typename";
 
         // Alias overloading (variants)
         if (opt.testAliasOverloading) {
@@ -626,7 +941,7 @@ public class DosScannerPanel extends JPanel {
                         buildDetailsAndExample(
                                 detailsAlias(firstField, n),
                                 exampleAlias(firstField, n)
-                        ));
+                        ), TestKind.ALIAS, n);
             }
         }
 
@@ -639,7 +954,7 @@ public class DosScannerPanel extends JPanel {
                         buildDetailsAndExample(
                                 detailsDup(firstField, n),
                                 exampleDup(firstField, n)
-                        ));
+                        ), TestKind.FIELD_DUP, n);
             }
         }
 
@@ -652,7 +967,7 @@ public class DosScannerPanel extends JPanel {
                         buildDetailsAndExample(
                                 detailsDirectives(firstField, n),
                                 exampleDirectives(firstField, n)
-                        ));
+                        ), TestKind.DIRECTIVES, n);
             }
         }
 
@@ -671,7 +986,8 @@ public class DosScannerPanel extends JPanel {
                 if (stopRequested.get()) break;
                 String q = buildIntrospectionNestingQuery(d);
                 sendProbe("Introspection nesting (" + d + ")", q, Map.of(),
-                        buildDetailsAndExample(detailsIntrospection(d), exampleIntrospection(d)));
+                        buildDetailsAndExample(detailsIntrospection(d), exampleIntrospection(d)),
+                        TestKind.INTROSPECTION_NEST, d);
             }
         }
 
@@ -690,7 +1006,8 @@ public class DosScannerPanel extends JPanel {
                     String q = sm.buildDepthQuery(d);
                     if (q == null) continue;
                     sendProbe("Query Depth (" + d + ")", q, Map.of(),
-                            buildDetailsAndExample(detailsDepth(d), exampleDepth(q)));
+                            buildDetailsAndExample(detailsDepth(d), exampleDepth(q)),
+                            TestKind.DEPTH, d);
                 }
             }
 
@@ -701,7 +1018,8 @@ public class DosScannerPanel extends JPanel {
                     String q = sm.buildFragmentExplosionQuery(n);
                     if (q == null) continue;
                     sendProbe("Fragment Explosion (" + n + ")", q, Map.of(),
-                            buildDetailsAndExample(detailsFragments(n), exampleFragments(q)));
+                            buildDetailsAndExample(detailsFragments(n), exampleFragments(q)),
+                            TestKind.FRAGMENT_EXPLOSION, n);
                 }
             }
 
@@ -713,7 +1031,8 @@ public class DosScannerPanel extends JPanel {
                     String q = sm.buildPaginationAbuseQuery(fc, opt.paginationValue);
                     if (q == null) continue;
                     sendProbe("Pagination Abuse (" + fc.field + ")", q, Map.of(),
-                            buildDetailsAndExample(detailsPagination(fc.field, opt.paginationValue), examplePagination(q)));
+                            buildDetailsAndExample(detailsPagination(fc.field, opt.paginationValue), examplePagination(q)),
+                            TestKind.PAGINATION_ABUSE, opt.paginationValue);
                 }
             }
 
@@ -747,20 +1066,21 @@ public class DosScannerPanel extends JPanel {
         if (stopRequested.get()) return;
         List<Map<String, Object>> arr = new ArrayList<>();
         for (int i = 0; i < batch; i++) {
+            // Many servers validate that operationName must exist inside the query document.
+            // To keep batching widely compatible, omit operationName entirely.
             arr.add(Map.of(
-                    "operationName", "Heavy" + i,
                     "query", query,
                     "variables", Map.of()
             ));
         }
-        String body = Json.stringify(arr);
+        String body = toJson(arr);
         HttpRequest req = updateBodyAndHeaders(baselineRequest, body, "application/json");
 
         sendAndRecord("Heavy Objects (" + fc.field + ", batch=" + batch + ")", req,
                 buildDetailsAndExample(
                         detailsHeavy(fc.field, batch),
                         exampleHeavy(query)
-                ));
+                ), TestKind.HEAVY_OBJECT, batch);
     }
 
     private void sendVariableBomb(ParsedGraphql pg, int bytes) {
@@ -783,7 +1103,8 @@ public class DosScannerPanel extends JPanel {
         HttpRequest req = updateBodyAndHeaders(baselineRequest, body, "application/json");
 
         sendAndRecord("Argument/Variable Bomb (" + bytes + " bytes)", req,
-                buildDetailsAndExample(detailsVariableBomb(bytes), exampleVariableBomb(q, vars)));
+                buildDetailsAndExample(detailsVariableBomb(bytes), exampleVariableBomb(q, vars)),
+                TestKind.VARIABLE_BOMB, bytes);
     }
 
     private Row sendBaseline() {
@@ -813,11 +1134,15 @@ public class DosScannerPanel extends JPanel {
         }
     }
 
-    private void sendProbe(String testName, String query, Map<String, Object> variables, String detailsHtml) {
+    private void sendProbe(String testName, String query, Map<String, Object> variables, String detailsHtml, TestKind kind, int magnitude) {
         if (stopRequested.get()) return;
         String body = buildJsonBody(query, null, variables);
         HttpRequest req = updateBodyAndHeaders(baselineRequest, body, "application/json");
-        sendAndRecord(testName, req, detailsHtml);
+        sendAndRecord(testName, req, detailsHtml, kind, magnitude);
+    }
+
+    private void sendProbe(String testName, String query, Map<String, Object> variables, String detailsHtml) {
+        sendProbe(testName, query, variables, detailsHtml, TestKind.OTHER, 0);
     }
 
     private void sendBatchProbe(String testName, ParsedGraphql pg, int batchSize, String detailsHtml) {
@@ -829,14 +1154,13 @@ public class DosScannerPanel extends JPanel {
         List<Map<String, Object>> arr = new ArrayList<>();
         for (int i = 0; i < batchSize; i++) {
             arr.add(Map.of(
-                    "operationName", "B" + i,
                     "query", q,
                     "variables", vars
             ));
         }
-        String body = Json.stringify(arr);
+        String body = toJson(arr);
         HttpRequest req = updateBodyAndHeaders(baselineRequest, body, "application/json");
-        sendAndRecord(testName, req, detailsHtml);
+        sendAndRecord(testName, req, detailsHtml, TestKind.BATCH, batchSize);
     }
 
     private void sendBaselineAmplification(ParsedGraphql pg, int batchSize) {
@@ -847,19 +1171,23 @@ public class DosScannerPanel extends JPanel {
         List<Map<String, Object>> arr = new ArrayList<>();
         for (int i = 0; i < batchSize; i++) {
             arr.add(Map.of(
-                    "operationName", "Amp" + i,
                     "query", q,
                     "variables", vars
             ));
         }
-        String body = Json.stringify(arr);
+        String body = toJson(arr);
         HttpRequest req = updateBodyAndHeaders(baselineRequest, body, "application/json");
 
         sendAndRecord("Baseline Amplification (batch=" + batchSize + ")", req,
-                buildDetailsAndExample(detailsAmplification(batchSize), exampleAmplification(q, batchSize)));
+                buildDetailsAndExample(detailsAmplification(batchSize), exampleAmplification(q, batchSize)),
+                TestKind.BASELINE_AMP, batchSize);
     }
 
     private void sendAndRecord(String testName, HttpRequest req, String detailsHtml) {
+        sendAndRecord(testName, req, detailsHtml, TestKind.OTHER, 0);
+    }
+
+    private void sendAndRecord(String testName, HttpRequest req, String detailsHtml, TestKind kind, int magnitude) {
         if (stopRequested.get()) return;
 
         boolean timeout = false;
@@ -879,10 +1207,7 @@ public class DosScannerPanel extends JPanel {
                 rr = null;
             }
             ms = (System.nanoTime() - t0) / 1_000_000L;
-
-            if (rr != null) {
-                resp = rr.response();
-            }
+            if (rr != null) resp = rr.response();
         } catch (Exception ex) {
             err = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         }
@@ -890,20 +1215,242 @@ public class DosScannerPanel extends JPanel {
         int len = (resp == null) ? 0 : resp.body().length();
         int payload = payloadSize(req);
         long delta = (baselineTimeMs > 0) ? (ms - baselineTimeMs) : 0;
-        boolean potential = isPotential(timeout, ms);
+
+        Impact impact = computeImpact(timeout, ms, delta, payload);
+        VulnResult vr = evaluateVulnerability(kind, magnitude, resp, timeout, err);
 
         Row row = Row.from(nextIndex(), testName, req, resp, ms, len, payload, err, timeout, detailsHtml);
         row.deltaTimeMs = delta;
-        row.potential = potential;
-
+        row.vulnerable = vr.status;
+        row.reason = vr.reason;
+        row.severity = computeSeverity(kind, row.vulnerable, vr.observedMagnitude, impact);
         addRow(row);
     }
 
-    private boolean isPotential(boolean timeout, long responseTimeMs) {
-        if (timeout) return true;
-        if (baselineTimeMs <= 0) return false;
-        if (responseTimeMs >= (long) (baselineTimeMs * opt.potentialTimeMultiplier)) return true;
-        return (responseTimeMs - baselineTimeMs) >= opt.potentialAbsoluteIncreaseMs;
+    private String computeSeverity(TestKind kind, VulnStatus status, int observedMagnitude, Impact impact) {
+        // Severity is scenario-aware and uses both capability (status/magnitude) and impact (latency/timeout).
+        if (status == VulnStatus.NO) {
+            // Impact-only: even if capability looks blocked, repeated heavy requests may still cause impact.
+            if (impact == Impact.HIGH) return "MEDIUM";
+            if (impact == Impact.MEDIUM) return "LOW";
+            return "NONE";
+        }
+
+        if (kind == TestKind.INTROSPECTION_ENABLED) {
+            // Introspection is information leakage, not DoS.
+            return status == VulnStatus.YES ? "INFO" : "NONE";
+        }
+
+        // If we are unsure, keep severity conservative unless impact is large.
+        if (status == VulnStatus.MAYBE) {
+            if (impact == Impact.HIGH) return "MEDIUM";
+            if (impact == Impact.MEDIUM) return "LOW";
+            return "NONE";
+        }
+
+        // status == YES
+        int t1; // LOW threshold
+        int t2; // MEDIUM threshold
+        int t3; // HIGH threshold
+        switch (kind) {
+            case ALIAS -> { t1 = 25; t2 = 50; t3 = opt.vulnAliasThreshold; }
+            case BATCH -> { t1 = 4; t2 = 8; t3 = opt.vulnBatchThreshold; }
+            case FIELD_DUP -> { t1 = 25; t2 = 50; t3 = opt.vulnFieldDupThreshold; }
+            case DIRECTIVES -> { t1 = 25; t2 = 50; t3 = opt.vulnDirectiveThreshold; }
+            case INTROSPECTION_NEST -> { t1 = 8; t2 = 12; t3 = opt.vulnIntrospectionDepthThreshold; }
+            case DEPTH -> { t1 = 6; t2 = 10; t3 = opt.vulnDepthThreshold; }
+            case FRAGMENT_EXPLOSION -> { t1 = 25; t2 = 50; t3 = opt.vulnFragmentThreshold; }
+            case VARIABLE_BOMB -> { t1 = 8_000; t2 = 16_000; t3 = opt.vulnVariableBytesThreshold; }
+            case PAGINATION_ABUSE -> { t1 = 1000; t2 = 5000; t3 = opt.vulnPaginationThreshold; }
+            case HEAVY_OBJECT, BASELINE_AMP -> { t1 = 5; t2 = 10; t3 = 20; }
+            default -> { t1 = 1; t2 = 1; t3 = 1; }
+        }
+
+        String sev;
+        if (observedMagnitude >= t3) sev = "HIGH";
+        else if (observedMagnitude >= t2) sev = "MEDIUM";
+        else if (observedMagnitude >= t1) sev = "LOW";
+        else sev = "LOW";
+
+        // Boost one level if the environment shows clear impact.
+        if (impact == Impact.HIGH && !"HIGH".equals(sev)) sev = "HIGH";
+        else if (impact == Impact.MEDIUM && "LOW".equals(sev)) sev = "MEDIUM";
+
+        return sev;
+    }
+
+    private enum TestKind {
+        OTHER,
+        ALIAS,
+        BATCH,
+        FIELD_DUP,
+        DIRECTIVES,
+        INTROSPECTION_ENABLED,
+        INTROSPECTION_NEST,
+        DEPTH,
+        FRAGMENT_EXPLOSION,
+        VARIABLE_BOMB,
+        PAGINATION_ABUSE,
+        HEAVY_OBJECT,
+        BASELINE_AMP
+    }
+
+    private static final class VulnResult {
+        final VulnStatus status;
+        final String reason;
+        final int observedMagnitude;
+
+        VulnResult(VulnStatus status, String reason, int observedMagnitude) {
+            this.status = (status == null) ? VulnStatus.MAYBE : status;
+            this.reason = reason == null ? "" : reason;
+            this.observedMagnitude = Math.max(0, observedMagnitude);
+        }
+    }
+
+    private static final class Impact {
+        final String label;
+        Impact(String label) { this.label = label; }
+        static final Impact NONE = new Impact("None");
+        static final Impact LOW = new Impact("Low");
+        static final Impact MEDIUM = new Impact("Medium");
+        static final Impact HIGH = new Impact("High");
+    }
+
+    private Impact computeImpact(boolean timeout, long ms, long delta, int payloadSize) {
+        if (timeout) return Impact.HIGH;
+        if (baselineTimeMs <= 0) return Impact.NONE;
+
+        // High
+        if (ms >= (long) (baselineTimeMs * opt.impactHighMultiplier) || delta >= opt.impactHighAbsoluteIncreaseMs) return Impact.HIGH;
+        // Medium
+        if (ms >= (long) (baselineTimeMs * opt.impactMediumMultiplier) || delta >= opt.impactMediumAbsoluteIncreaseMs) return Impact.MEDIUM;
+        // Low
+        if (ms >= (long) (baselineTimeMs * opt.impactLowMultiplier) || delta >= opt.impactLowAbsoluteIncreaseMs) return Impact.LOW;
+
+        // Very large payload can be a weak signal even if time does not spike.
+        if (payloadSize >= opt.impactLargePayloadBytes) return Impact.LOW;
+        return Impact.NONE;
+    }
+
+    private VulnResult evaluateVulnerability(TestKind kind, int magnitude, HttpResponse resp, boolean timeout, String error) {
+        if (timeout) {
+            // Timeout is a strong impact signal but can still be inconclusive (network / proxy).
+            return new VulnResult(VulnStatus.MAYBE, "Timed out while processing payload", magnitude);
+        }
+        if (resp == null) {
+            return new VulnResult(VulnStatus.MAYBE, (error == null || error.isBlank()) ? "No response" : ("Request failed: " + error), magnitude);
+        }
+
+        String body = "";
+        try { body = resp.bodyToString(); } catch (Exception ignored) {}
+        String trimmed = body == null ? "" : body.trim();
+
+        // Introspection enabled is a capability check (Info Leak) used to power schema-driven tests.
+        if (kind == TestKind.INTROSPECTION_ENABLED) {
+            boolean ok = trimmed.contains("__schema") || trimmed.contains("__type");
+            return new VulnResult(ok ? VulnStatus.YES : VulnStatus.NO,
+                    ok ? "Introspection returned schema metadata" : "Introspection not available",
+                    magnitude);
+        }
+
+        // Batch queries: response should be a JSON array when sending an array body.
+        if (kind == TestKind.BATCH) {
+            boolean accepted = trimmed.startsWith("[") && trimmed.endsWith("]");
+            String reason = accepted ? ("Batch array accepted (" + magnitude + " ops)") : "Batch array rejected";
+            if (!accepted) {
+                return new VulnResult(VulnStatus.NO, reason, magnitude);
+            }
+            VulnStatus st = magnitude >= opt.vulnBatchThreshold ? VulnStatus.YES : VulnStatus.MAYBE;
+            if (st == VulnStatus.MAYBE) reason += " (below threshold)";
+            return new VulnResult(st, reason, magnitude);
+        }
+
+        // For other probes, parse GraphQL errors (if any).
+        boolean hasErrors = false;
+        String firstErrorMessage = "";
+        try {
+            Object parsed = Json.parse(trimmed);
+            if (parsed instanceof Map<?,?> map) {
+                Object errs = map.get("errors");
+                if (errs instanceof List<?> lst && !lst.isEmpty()) {
+                    hasErrors = true;
+                    Object e0 = lst.get(0);
+                    if (e0 instanceof Map<?,?> em) {
+                        Object msg = em.get("message");
+                        if (msg != null) firstErrorMessage = String.valueOf(msg);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // If not JSON, fall back to basic string checks.
+            hasErrors = trimmed.contains("\"errors\"");
+        }
+
+        // If our generated query is invalid (wrong field), the result is inconclusive.
+        if (hasErrors) {
+            String m = firstErrorMessage == null ? "" : firstErrorMessage;
+            String ml = m.toLowerCase(Locale.ROOT);
+            if (ml.contains("cannot query field") || ml.contains("unknown argument") || ml.contains("unknown type") || ml.contains("syntax error")) {
+                return new VulnResult(VulnStatus.MAYBE,
+                        (m.isBlank() ? "GraphQL validation error" : ("GraphQL validation error: " + m)),
+                        magnitude);
+            }
+
+            // Common limit/defense messages -> treat as blocked.
+            if (ml.contains("too complex") || ml.contains("complexity") || ml.contains("depth") || ml.contains("max") || ml.contains("limit") || ml.contains("exceed")) {
+                return new VulnResult(VulnStatus.NO,
+                        (m.isBlank() ? "Rejected by server limits" : ("Rejected by server limits: " + m)),
+                        magnitude);
+            }
+        }
+
+        boolean accepted = !hasErrors && (resp.statusCode() >= 200 && resp.statusCode() < 300);
+        if (!accepted) {
+            // Some servers return 400 for GraphQL errors; if we don't have a clear limit signal, keep it MAYBE.
+            if (hasErrors) {
+                String m = firstErrorMessage == null ? "" : firstErrorMessage;
+                return new VulnResult(VulnStatus.MAYBE,
+                        m.isBlank() ? "GraphQL errors returned" : ("GraphQL errors returned: " + m),
+                        magnitude);
+            }
+            return new VulnResult(VulnStatus.NO, "Non-2xx response", magnitude);
+        }
+
+        int threshold = switch (kind) {
+            case ALIAS -> opt.vulnAliasThreshold;
+            case FIELD_DUP -> opt.vulnFieldDupThreshold;
+            case DIRECTIVES -> opt.vulnDirectiveThreshold;
+            case INTROSPECTION_NEST -> opt.vulnIntrospectionDepthThreshold;
+            case DEPTH -> opt.vulnDepthThreshold;
+            case FRAGMENT_EXPLOSION -> opt.vulnFragmentThreshold;
+            case VARIABLE_BOMB -> opt.vulnVariableBytesThreshold;
+            case PAGINATION_ABUSE -> opt.vulnPaginationThreshold;
+            case HEAVY_OBJECT, BASELINE_AMP, OTHER -> 0;
+            default -> 0;
+        };
+        VulnStatus status;
+        if (threshold <= 0) status = VulnStatus.YES;
+        else if (magnitude >= threshold) status = VulnStatus.YES;
+        else status = VulnStatus.MAYBE;
+
+        String reason;
+        switch (kind) {
+            case ALIAS -> reason = "Accepted aliases: " + magnitude;
+            case FIELD_DUP -> reason = "Accepted duplicate fields: " + magnitude;
+            case DIRECTIVES -> reason = "Accepted duplicate directives: " + magnitude;
+            case INTROSPECTION_NEST -> reason = "Accepted introspection nesting: " + magnitude;
+            case DEPTH -> reason = "Accepted query depth: " + magnitude;
+            case FRAGMENT_EXPLOSION -> reason = "Accepted fragment expansion: " + magnitude;
+            case VARIABLE_BOMB -> reason = "Accepted variables payload: " + magnitude + " bytes";
+            case PAGINATION_ABUSE -> reason = "Accepted pagination size: " + magnitude;
+            case HEAVY_OBJECT -> reason = "Accepted heavy object query";
+            case BASELINE_AMP -> reason = "Accepted baseline amplification";
+            default -> reason = "Accepted";
+        }
+        if (threshold > 0 && magnitude < threshold) {
+            reason += " (below threshold)";
+        }
+        return new VulnResult(status, reason, magnitude);
     }
 
     private Future<HttpRequestResponse> submitSend(HttpRequest req) {
@@ -941,12 +1488,7 @@ public class DosScannerPanel extends JPanel {
             else resEd.setResponse(HttpResponse.httpResponse(ByteArray.byteArray(new byte[0])));
         }
 
-        // split stored HTML into details + example
-        String[] parts = splitDetails(row.detailsHtml);
-        detailsPane.setText(parts[0]);
-        examplePane.setText(parts[1]);
-        detailsPane.setCaretPosition(0);
-        examplePane.setCaretPosition(0);
+        // Explanations/examples live in the Attack Guide tab.
     }
 
     private static String[] splitDetails(String combinedHtml) {
@@ -958,7 +1500,35 @@ public class DosScannerPanel extends JPanel {
         return new String[]{a, b};
     }
 
-    // ---------------------------
+    
+
+    private Integer getSelectedRowStableIndex() {
+        try {
+            int r = table.getSelectedRow();
+            if (r < 0 || r >= viewRows.size()) return null;
+            return viewRows.get(r).index;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void restoreSelectionByStableIndex(Integer stableIndex) {
+        if (stableIndex == null) return;
+        for (int i = 0; i < viewRows.size(); i++) {
+            if (viewRows.get(i).index == stableIndex) {
+                final int rr = i;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        table.setRowSelectionInterval(rr, rr);
+                        table.scrollRectToVisible(table.getCellRect(rr, 0, true));
+                    } catch (Exception ignored) {}
+                });
+                return;
+            }
+        }
+    }
+
+// ---------------------------
     // Pagination + model
     // ---------------------------
 
@@ -971,8 +1541,6 @@ public class DosScannerPanel extends JPanel {
         baselineTimeMs = -1;
 
         SwingUtilities.invokeLater(() -> {
-            detailsPane.setText("");
-            examplePane.setText("");
             if (reqEd != null) reqEd.setRequest(HttpRequest.httpRequest(ByteArray.byteArray(new byte[0])));
             if (resEd != null) resEd.setResponse(HttpResponse.httpResponse(ByteArray.byteArray(new byte[0])));
         });
@@ -983,9 +1551,11 @@ public class DosScannerPanel extends JPanel {
             allRows.add(row);
         }
         SwingUtilities.invokeLater(() -> {
+            Integer sel = getSelectedRowStableIndex();
             refreshPage();
-            // auto-select first row if none
-            if (table.getSelectedRow() < 0 && !viewRows.isEmpty()) {
+            if (sel != null) {
+                restoreSelectionByStableIndex(sel);
+            } else if (!scanRunning && table.getSelectedRow() < 0 && !viewRows.isEmpty()) {
                 table.setRowSelectionInterval(0, 0);
             }
         });
@@ -998,6 +1568,7 @@ public class DosScannerPanel extends JPanel {
     }
 
     private void refreshPage() {
+        Integer sel = getSelectedRowStableIndex();
         synchronized (allRows) {
             viewRows.clear();
             int start = (currentPage - 1) * 10;
@@ -1010,6 +1581,7 @@ public class DosScannerPanel extends JPanel {
             for (int i = start; i < end; i++) viewRows.add(allRows.get(i));
         }
         model.fireTableDataChanged();
+        if (sel != null) restoreSelectionByStableIndex(sel);
         pageLabel.setText("Page " + currentPage + " / " + maxPage());
         btnPrev.setEnabled(currentPage > 1);
         btnNext.setEnabled(currentPage < maxPage());
@@ -1028,14 +1600,38 @@ public class DosScannerPanel extends JPanel {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 setHorizontalAlignment(SwingConstants.LEFT);
 
+                // Colorize key columns for faster visual scanning.
+                // Column index is based on the view model ordering:
+                // 0 Index | 1 Vulnerable | 2 Severity | 3 Reason | ...
+                if (!isSelected) {
+                    if (column == 1) { // Vulnerable
+                        String s = value == null ? "" : String.valueOf(value);
+                        if ("Yes".equalsIgnoreCase(s)) c.setForeground(new Color(200, 0, 0));
+                        else if ("Maybe".equalsIgnoreCase(s)) c.setForeground(new Color(255, 140, 0));
+                        else c.setForeground(Color.DARK_GRAY);
+                    } else if (column == 2) { // Severity
+                        String s = value == null ? "" : String.valueOf(value);
+                        if ("LOW".equalsIgnoreCase(s)) {
+                            c.setForeground(new Color(0, 102, 204)); // blue
+                        } else if ("MEDIUM".equalsIgnoreCase(s)) {
+                            c.setForeground(new Color(255, 140, 0)); // orange
+                        } else if ("HIGH".equalsIgnoreCase(s)) {
+                            c.setForeground(new Color(200, 0, 0)); // red
+                        } else if ("INFO".equalsIgnoreCase(s)) {
+                            c.setForeground(new Color(90, 90, 90));
+                        } else {
+                            c.setForeground(Color.DARK_GRAY);
+                        }
+                    } else {
+                        c.setForeground(Color.DARK_GRAY);
+                    }
+                }
+
                 if (table.getModel() instanceof DosTableModel m) {
                     Row rr = m.rows.get(row);
                     Font f = c.getFont();
-                    if (rr != null && rr.potential) {
-                        c.setFont(f.deriveFont(Font.BOLD));
-                    } else {
-                        c.setFont(f.deriveFont(Font.PLAIN));
-                    }
+                    boolean bold = rr != null && (rr.vulnerable == VulnStatus.YES || "HIGH".equals(rr.severity) || "MEDIUM".equals(rr.severity));
+                    c.setFont(f.deriveFont(bold ? Font.BOLD : Font.PLAIN));
                 }
                 return c;
             }
@@ -1075,11 +1671,29 @@ public class DosScannerPanel extends JPanel {
         menu.add(makeIntSpinnerRow("Timeout (ms)", opt.timeoutMs, 1000, 120000, 500, v -> opt.timeoutMs = v));
         menu.add(makeIntSpinnerRow("Concurrency", opt.concurrency, 1, 64, 1, v -> opt.concurrency = v));
 
-        // --- Potential rule
+        // --- Impact (Potential High/Medium/Low)
         menu.addSeparator();
-        menu.add(makeSectionLabel("Potential rule"));
-        menu.add(makeDoubleSpinnerRow("Baseline multiplier", opt.potentialTimeMultiplier, 1.0, 50.0, 0.5, v -> opt.potentialTimeMultiplier = v));
-        menu.add(makeLongSpinnerRow("Absolute Δms", opt.potentialAbsoluteIncreaseMs, 0L, 120000L, 250L, v -> opt.potentialAbsoluteIncreaseMs = v));
+        menu.add(makeSectionLabel("Impact thresholds"));
+        menu.add(makeDoubleSpinnerRow("High: baseline x", opt.impactHighMultiplier, 1.0, 50.0, 0.5, v -> opt.impactHighMultiplier = v));
+        menu.add(makeLongSpinnerRow("High: absolute Δms", opt.impactHighAbsoluteIncreaseMs, 0L, 120000L, 250L, v -> opt.impactHighAbsoluteIncreaseMs = v));
+        menu.add(makeDoubleSpinnerRow("Medium: baseline x", opt.impactMediumMultiplier, 1.0, 50.0, 0.5, v -> opt.impactMediumMultiplier = v));
+        menu.add(makeLongSpinnerRow("Medium: absolute Δms", opt.impactMediumAbsoluteIncreaseMs, 0L, 120000L, 250L, v -> opt.impactMediumAbsoluteIncreaseMs = v));
+        menu.add(makeDoubleSpinnerRow("Low: baseline x", opt.impactLowMultiplier, 1.0, 50.0, 0.1, v -> opt.impactLowMultiplier = v));
+        menu.add(makeLongSpinnerRow("Low: absolute Δms", opt.impactLowAbsoluteIncreaseMs, 0L, 120000L, 50L, v -> opt.impactLowAbsoluteIncreaseMs = v));
+        menu.add(makeIntSpinnerRow("Low: payload bytes", opt.impactLargePayloadBytes, 0, 5_000_000, 1000, v -> opt.impactLargePayloadBytes = v));
+
+        // --- Vulnerability thresholds
+        menu.addSeparator();
+        menu.add(makeSectionLabel("Vulnerable = Yes if accepted and ≥ threshold"));
+        menu.add(makeIntSpinnerRow("Alias threshold", opt.vulnAliasThreshold, 0, 5000, 5, v -> opt.vulnAliasThreshold = v));
+        menu.add(makeIntSpinnerRow("Batch threshold", opt.vulnBatchThreshold, 0, 5000, 1, v -> opt.vulnBatchThreshold = v));
+        menu.add(makeIntSpinnerRow("Field-dup threshold", opt.vulnFieldDupThreshold, 0, 5000, 5, v -> opt.vulnFieldDupThreshold = v));
+        menu.add(makeIntSpinnerRow("Directives threshold", opt.vulnDirectiveThreshold, 0, 5000, 5, v -> opt.vulnDirectiveThreshold = v));
+        menu.add(makeIntSpinnerRow("Introspection depth threshold", opt.vulnIntrospectionDepthThreshold, 0, 100, 1, v -> opt.vulnIntrospectionDepthThreshold = v));
+        menu.add(makeIntSpinnerRow("Depth threshold", opt.vulnDepthThreshold, 0, 200, 1, v -> opt.vulnDepthThreshold = v));
+        menu.add(makeIntSpinnerRow("Fragments threshold", opt.vulnFragmentThreshold, 0, 5000, 5, v -> opt.vulnFragmentThreshold = v));
+        menu.add(makeIntSpinnerRow("Variable bytes threshold", opt.vulnVariableBytesThreshold, 0, 50_000_000, 1000, v -> opt.vulnVariableBytesThreshold = v));
+        menu.add(makeIntSpinnerRow("Pagination threshold", opt.vulnPaginationThreshold, 0, 1_000_000, 10, v -> opt.vulnPaginationThreshold = v));
 
         // --- Ranges
         menu.addSeparator();
@@ -1502,12 +2116,85 @@ public class DosScannerPanel extends JPanel {
         }
     }
 
+    // ---------------------------
+    // JSON building helpers (no Jackson dependency)
+    // ---------------------------
+    private static String toJson(Object obj) {
+        StringBuilder sb = new StringBuilder(256);
+        appendJson(sb, obj);
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void appendJson(StringBuilder sb, Object obj) {
+        if (obj == null) {
+            sb.append("null");
+            return;
+        }
+        if (obj instanceof String s) {
+            sb.append('"').append(escapeJson(s)).append('"');
+            return;
+        }
+        if (obj instanceof Number || obj instanceof Boolean) {
+            sb.append(String.valueOf(obj));
+            return;
+        }
+        if (obj instanceof Map<?, ?> map) {
+            sb.append('{');
+            boolean first = true;
+            for (var e : map.entrySet()) {
+                if (!first) sb.append(',');
+                first = false;
+                sb.append('"').append(escapeJson(String.valueOf(e.getKey()))).append('"').append(':');
+                appendJson(sb, e.getValue());
+            }
+            sb.append('}');
+            return;
+        }
+        if (obj instanceof Iterable<?> it) {
+            sb.append('[');
+            boolean first = true;
+            for (Object v : it) {
+                if (!first) sb.append(',');
+                first = false;
+                appendJson(sb, v);
+            }
+            sb.append(']');
+            return;
+        }
+        // Fallback: stringify as JSON string
+        sb.append('"').append(escapeJson(String.valueOf(obj))).append('"');
+    }
+
+    private static String escapeJson(String s) {
+        StringBuilder out = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
+    }
+
     private static String buildJsonBody(String query, String operationName, Map<String, Object> variables) {
         Map<String, Object> m = new LinkedHashMap<>();
         if (operationName != null && !operationName.isBlank()) m.put("operationName", operationName);
         m.put("query", (query == null || query.isBlank()) ? "query { __typename }" : query);
         m.put("variables", (variables == null) ? Map.of() : variables);
-        return Json.stringify(m);
+        // Do not rely on Jackson presence at runtime; Burp classloaders can conflict.
+        return toJson(m);
     }
 
     private static ParsedGraphql parseGraphqlFromRequest(HttpRequest req) {
@@ -1517,6 +2204,13 @@ public class DosScannerPanel extends JPanel {
             if (body == null) return new ParsedGraphql(null, Map.of());
             body = body.trim();
 
+            // Raw GraphQL (application/graphql) bodies may start with "query"/"mutation" (or just "{" for shorthand),
+            // BUT JSON request bodies also start with "{". Prefer JSON parsing first and only treat as raw GraphQL
+            // when it clearly looks like a GraphQL document.
+            if (body.startsWith("query") || body.startsWith("mutation") || body.startsWith("subscription")) {
+                return new ParsedGraphql(body, Map.of());
+            }
+
             if (body.startsWith("[")) {
                 // take first item
                 Object parsed = Json.parse(body);
@@ -1525,6 +2219,9 @@ public class DosScannerPanel extends JPanel {
                     Object vars = mm.get("variables");
                     return new ParsedGraphql(q, castVars(vars));
                 }
+                // Fallback (no JSON parser available): extract first "query" string
+                String q = extractJsonStringValue(body, "query");
+                if (q != null) return new ParsedGraphql(q, Map.of());
             }
 
             Object parsed = Json.parse(body);
@@ -1533,9 +2230,44 @@ public class DosScannerPanel extends JPanel {
                 Object vars = map.get("variables");
                 return new ParsedGraphql(q, castVars(vars));
             }
+            // Fallback (no JSON parser available)
+            String q2 = extractJsonStringValue(body, "query");
+            if (q2 != null) return new ParsedGraphql(q2, Map.of());
         } catch (Exception ignored) {
         }
         return new ParsedGraphql(null, Map.of());
+    }
+
+    // Very small JSON string extractor for cases where JSON parsing library is unavailable.
+    // Extracts the first occurrence of "<key>":"..." and unescapes \n/\r/\t/\\/\".
+    private static String extractJsonStringValue(String json, String key) {
+        if (json == null || key == null) return null;
+        Pattern p = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*\\\"(.*?)\\\"", Pattern.DOTALL);
+        Matcher m = p.matcher(json);
+        if (!m.find()) return null;
+        return unescapeJsonString(m.group(1));
+    }
+
+    private static String unescapeJsonString(String s) {
+        if (s == null) return null;
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char n = s.charAt(++i);
+                switch (n) {
+                    case 'n' -> out.append('\n');
+                    case 'r' -> out.append('\r');
+                    case 't' -> out.append('\t');
+                    case '\\' -> out.append('\\');
+                    case '"' -> out.append('"');
+                    default -> out.append(n);
+                }
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     @SuppressWarnings("unchecked")
@@ -1626,8 +2358,41 @@ public class DosScannerPanel extends JPanel {
     // Table model + row
     // ---------------------------
 
+    private enum VulnStatus {
+        NO,
+        MAYBE,
+        YES;
+
+        String display() {
+            return switch (this) {
+                case NO -> "No";
+                case MAYBE -> "Maybe";
+                case YES -> "Yes";
+            };
+        }
+
+        int score() {
+            return switch (this) {
+                case YES -> 2;
+                case MAYBE -> 1;
+                case NO -> 0;
+            };
+        }
+
+        @Override public String toString() {
+            return switch (this) {
+                case YES -> "Yes";
+                case MAYBE -> "Maybe";
+                case NO -> "No";
+            };
+        }
+    }
+
     private static final class Row {
         final int index;
+        VulnStatus vulnerable;
+        String severity; // HIGH/MEDIUM/LOW/INFO/NONE
+        String reason;
         final String testName;
         final HttpRequest request;
         final HttpResponse response;
@@ -1638,7 +2403,6 @@ public class DosScannerPanel extends JPanel {
         final int payloadSize;
         final String error;
         final boolean timeout;
-        boolean potential;
         final String detailsHtml;
 
         private Row(int index, String testName, HttpRequest request, HttpResponse response,
@@ -1655,7 +2419,23 @@ public class DosScannerPanel extends JPanel {
             this.error = error;
             this.timeout = timeout;
             this.detailsHtml = detailsHtml;
+
+            this.vulnerable = VulnStatus.NO;
+            this.severity = "NONE";
+            this.reason = "";
         }
+
+        int severityScore() {
+            if (severity == null) return 0;
+            return switch (severity) {
+                case "HIGH" -> 4;
+                case "MEDIUM" -> 3;
+                case "LOW" -> 2;
+                case "INFO" -> 1;
+                default -> 0;
+            };
+        }
+
 
         static Row from(int index, String testName, HttpRequest request, HttpResponse response,
                         long responseTimeMs, int responseLength, int payloadSize, String error,
@@ -1670,7 +2450,7 @@ public class DosScannerPanel extends JPanel {
         private final List<Row> rows;
 
         private final String[] cols = new String[]{
-                "Index", "Potential", "Test", "Status code", "Response Time (ms)", "ΔTime vs Baseline (ms)",
+                "Index", "Vulnerable", "Severity", "Reason", "Test", "Status code", "Response Time (ms)", "ΔTime vs Baseline (ms)",
                 "Response Length", "Payload Size", "Error", "Timeout"
         };
 
@@ -1687,15 +2467,17 @@ public class DosScannerPanel extends JPanel {
             Row r = rows.get(rowIndex);
             return switch (columnIndex) {
                 case 0 -> r.index;
-                case 1 -> r.potential ? "Yes" : "No";
-                case 2 -> r.testName;
-                case 3 -> r.statusCode;
-                case 4 -> r.responseTimeMs;
-                case 5 -> r.deltaTimeMs;
-                case 6 -> r.responseLength;
-                case 7 -> r.payloadSize;
-                case 8 -> r.error;
-                case 9 -> r.timeout ? "Yes" : "No";
+                case 1 -> r.vulnerable == null ? "Maybe" : r.vulnerable.display();
+                case 2 -> (r.severity == null || r.severity.isBlank()) ? "NONE" : r.severity;
+                case 3 -> r.reason;
+                case 4 -> r.testName;
+                case 5 -> r.statusCode;
+                case 6 -> r.responseTimeMs;
+                case 7 -> r.deltaTimeMs;
+                case 8 -> r.responseLength;
+                case 9 -> r.payloadSize;
+                case 10 -> r.error;
+                case 11 -> r.timeout ? "Yes" : "No";
                 default -> "";
             };
         }
@@ -1704,8 +2486,8 @@ public class DosScannerPanel extends JPanel {
         public Class<?> getColumnClass(int columnIndex) {
             return switch (columnIndex) {
                 case 0 -> Integer.class;
-                case 4, 5 -> Long.class;
-                case 6, 7 -> Integer.class;
+                case 6, 7 -> Long.class;
+                case 8, 9 -> Integer.class;
                 default -> String.class;
             };
         }
@@ -1715,8 +2497,27 @@ public class DosScannerPanel extends JPanel {
         int timeoutMs = 8000;
         int concurrency = 2;
 
-        double potentialTimeMultiplier = 3.0;
-        long potentialAbsoluteIncreaseMs = 2000;
+        // Impact (Potential) thresholds
+        // More sensitive defaults (useful in fast local environments like DVGA).
+        // Users can tune these from Options.
+        double impactHighMultiplier = 1.8;
+        long impactHighAbsoluteIncreaseMs = 250;
+        double impactMediumMultiplier = 1.3;
+        long impactMediumAbsoluteIncreaseMs = 120;
+        double impactLowMultiplier = 1.10;
+        long impactLowAbsoluteIncreaseMs = 40;
+        int impactLargePayloadBytes = 80_000;
+
+        // Vulnerable thresholds ("Yes" if accepted and magnitude >= threshold). Set to 0 to disable.
+        int vulnAliasThreshold = 100;
+        int vulnBatchThreshold = 10;
+        int vulnFieldDupThreshold = 100;
+        int vulnDirectiveThreshold = 50;
+        int vulnIntrospectionDepthThreshold = 15;
+        int vulnDepthThreshold = 12;
+        int vulnFragmentThreshold = 80;
+        int vulnVariableBytesThreshold = 25000;
+        int vulnPaginationThreshold = 10000;
 
         boolean testAliasOverloading = true;
         boolean testBatchQueries = true;
@@ -1970,13 +2771,21 @@ public class DosScannerPanel extends JPanel {
                 TypeInfo ti = TypeInfo.from(f.returnType);
                 String base = ti.baseType;
                 boolean isScalar = SCALARS.contains(base);
-                if (isScalar) continue;
 
                 boolean hasPag = f.args.stream().anyMatch(a -> a.isPaginationArg());
                 int score = 0;
+
+                if (isScalar) {
+                    // Scalar fields can still be expensive (slow resolvers). Include likely-heavy scalars by name.
+                    if (!hasPag && looksSlowScalarName(f.name)) {
+                        score += 6;
+                        out.add(new FieldCandidate(f.name, f.returnType, false, false, score));
+                    }
+                    continue;
+                }
+
                 if (ti.isList) score += 5;
                 if (hasPag) score += 3;
-                // heuristic: likely expensive if list or has pagination args
                 score += 1;
 
                 out.add(new FieldCandidate(f.name, f.returnType, ti.isList, hasPag, score));
@@ -1985,6 +2794,39 @@ public class DosScannerPanel extends JPanel {
             out.sort((a, b) -> Integer.compare(b.score, a.score));
             if (out.size() > max) return out.subList(0, max);
             return out;
+        }
+
+        /**
+         * Best-effort root field selection used for alias/dup/directives probes.
+         * Prefers list-like fields and fields that look like pagination/connection.
+         */
+        String pickDefaultQueryFieldName() {
+            TypeDef q = types.get(queryTypeName);
+            if (q == null || q.fields.isEmpty()) return null;
+
+            FieldDef best = null;
+            int bestScore = Integer.MIN_VALUE;
+            for (FieldDef f : q.fields) {
+                if (f == null || f.name == null || f.name.isBlank()) continue;
+                TypeInfo ti = TypeInfo.from(f.returnType);
+                int score = 0;
+                // Prefer non-scalar fields
+                if (!SCALARS.contains(ti.baseType)) score += 2;
+                // Prefer lists/connections
+                if (ti.isList) score += 4;
+                if (ti.baseType != null && ti.baseType.toLowerCase(Locale.ROOT).contains("connection")) score += 3;
+                // Prefer pagination-like args
+                boolean hasPag = f.args.stream().anyMatch(a -> a.isPaginationArg());
+                if (hasPag) score += 3;
+                // De-prioritize mutations (should not appear on query type, but just in case)
+                if (f.name.toLowerCase(Locale.ROOT).startsWith("delete") || f.name.toLowerCase(Locale.ROOT).startsWith("remove")) score -= 2;
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = f;
+                }
+            }
+            return best == null ? null : best.name;
         }
 
         List<FieldCandidate> pickPaginationFields(int max) {
@@ -2000,9 +2842,11 @@ public class DosScannerPanel extends JPanel {
         String buildHeavyFieldQuery(FieldCandidate fc) {
             if (fc == null) return null;
             TypeInfo ti = TypeInfo.from(fc.returnType);
-            if (SCALARS.contains(ti.baseType)) return null;
 
-            // For object/list: { field { __typename } }
+            if (SCALARS.contains(ti.baseType)) {
+                return "query Heavy { " + fc.field + " }";
+            }
+
             return "query Heavy { " + fc.field + " { __typename } }";
         }
 
@@ -2032,8 +2876,8 @@ public class DosScannerPanel extends JPanel {
                 d++;
             }
             sb.append("__typename");
+            // We opened exactly 'd' selection sets (start + nested). Close them all, then close the query.
             for (int i = 0; i < d; i++) sb.append(" }");
-            sb.append(" }"); // close start selection
             sb.append(" }");
 
             return sb.toString();
@@ -2078,6 +2922,28 @@ public class DosScannerPanel extends JPanel {
                 return "query Paginate { " + fd.name + "(" + argName + ":" + value + ") }";
             }
             return "query Paginate { " + fd.name + "(" + argName + ":" + value + ") { __typename } }";
+        }
+
+        static boolean looksSlowScalarName(String n) {
+            if (n == null) return false;
+            String x = n.toLowerCase(Locale.ROOT);
+
+            return x.contains("system")
+                    || x.contains("update")
+                    || x.contains("backup")
+                    || x.contains("restore")
+                    || x.contains("migrate")
+                    || x.contains("rebuild")
+                    || x.contains("reindex")
+                    || x.contains("sync")
+                    || x.contains("export")
+                    || x.contains("import")
+                    || x.contains("report")
+                    || x.contains("diagnos")
+                    || x.contains("health")
+                    || x.contains("status")
+                    || x.contains("metrics")
+                    || x.contains("maintenance");
         }
 
         static boolean isPaginationArgName(String n) {

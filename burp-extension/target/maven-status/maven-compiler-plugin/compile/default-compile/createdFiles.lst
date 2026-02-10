@@ -6,8 +6,11 @@ com\gqlasa\ui\dos\DosScannerPanel$DosTableModel.class
 com\gqlasa\ui\querybuilder\SchemaPanel$3.class
 com\gqlasa\core\schema\GqlTypeDef.class
 com\gqlasa\ui\csrf\CsrfScannerPanel$Variant.class
+com\gqlasa\ui\querybuilder\PathsToQueriesPanel$4.class
+com\gqlasa\ui\dos\DosScannerPanel$VulnStatus.class
 com\gqlasa\GqlAsaExtension.class
 com\gqlasa\ui\csrf\CsrfScannerPanel.class
+com\gqlasa\util\Json$MiniJson.class
 com\gqlasa\ui\querybuilder\SchemaPanel.class
 com\gqlasa\ui\querybuilder\GeneralConfigPanel.class
 com\gqlasa\model\BurpBody.class
@@ -20,6 +23,7 @@ com\gqlasa\ui\csrf\CsrfScannerPanel$4.class
 com\gqlasa\ui\csrf\CsrfScannerPanel$ScanOptions.class
 com\gqlasa\ui\querybuilder\SchemaPanel$2.class
 com\gqlasa\ui\MainPanel.class
+com\gqlasa\ui\dos\DosScannerPanel$TestKind.class
 com\gqlasa\core\schema\SchemaIndex.class
 com\gqlasa\core\BurpRequestBuilder.class
 com\gqlasa\model\BuiltQuery.class
@@ -27,6 +31,7 @@ com\gqlasa\ui\querybuilder\GeneralConfigPanel$2.class
 com\gqlasa\ui\querybuilder\PathsToQueriesPanel$3.class
 com\gqlasa\ui\csrf\CsrfScannerPanel$CsrfTableModel.class
 com\gqlasa\core\PathFinder$Segment.class
+com\gqlasa\ui\dos\DosScannerPanel$Impact.class
 com\gqlasa\ui\dos\DosScannerPanel$5.class
 com\gqlasa\core\SchemaLoader.class
 com\gqlasa\model\AppState.class
@@ -39,7 +44,6 @@ com\gqlasa\ui\querybuilder\ProgressDialog.class
 com\gqlasa\model\GeneralConfig.class
 com\gqlasa\ui\dos\DosScannerPanel$Options.class
 com\gqlasa\ui\querybuilder\SchemaPanel$1.class
-com\gqlasa\util\Json$1.class
 com\gqlasa\ui\dos\DosScannerPanel$4.class
 com\gqlasa\ui\dos\DosScannerPanel$TypeInfo.class
 com\gqlasa\ui\dos\DosScannerPanel$FieldCandidate.class
@@ -48,6 +52,7 @@ com\gqlasa\ui\csrf\CsrfScannerPanel$2.class
 com\gqlasa\ui\dos\DosScannerPanel$3.class
 com\gqlasa\ui\querybuilder\QueryBuilderPanel.class
 com\gqlasa\core\PathFinder.class
+com\gqlasa\ui\dos\DosScannerPanel$VulnResult.class
 com\gqlasa\ui\querybuilder\PathsToQueriesPanel$2.class
 com\gqlasa\ui\querybuilder\HeadersTableModel.class
 com\gqlasa\ui\dos\DosScannerPanel$1.class
@@ -56,8 +61,8 @@ com\gqlasa\ui\querybuilder\PathsToQueriesPanel$1.class
 com\gqlasa\ui\dos\DosScannerPanel$FieldDef.class
 com\gqlasa\model\HeaderKV.class
 com\gqlasa\ui\dos\DosScannerPanel$TypeDef.class
+com\gqlasa\ui\dos\DosScannerPanel$GuideScenario.class
 com\gqlasa\ui\querybuilder\SchemaPanel$4.class
-com\gqlasa\util\Json$2.class
 com\gqlasa\ui\dos\DosScannerPanel.class
 com\gqlasa\ui\csrf\CsrfScannerPanel$3.class
 com\gqlasa\ui\querybuilder\IntrospectionImportProvider.class

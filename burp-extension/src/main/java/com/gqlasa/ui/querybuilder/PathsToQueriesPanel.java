@@ -110,6 +110,27 @@ public class PathsToQueriesPanel extends JPanel {
 
         table.setComponentPopupMenu(popup);
 
+        // Ensure the row under the mouse is selected before executing popup actions.
+        // Without this, "Send to Repeater" may act on a previously-selected row.
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            private void selectRow(java.awt.event.MouseEvent e) {
+                int viewRow = table.rowAtPoint(e.getPoint());
+                if (viewRow >= 0) {
+                    table.setRowSelectionInterval(viewRow, viewRow);
+                }
+            }
+
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                if (e.isPopupTrigger()) selectRow(e);
+            }
+
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent e) {
+                if (e.isPopupTrigger()) selectRow(e);
+            }
+        });
+
         table.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) return;
             onRowSelected();
@@ -479,8 +500,31 @@ JPanel bottom = new JPanel(new BorderLayout());
 
         String http = BurpRequestBuilder.buildHttpRequest(cfg, r.builtQuery);
 
-        String url = cfg.scheme + "://" + cfg.host + (needsPort(cfg) ? ":" + cfg.port : "");
-        HttpService service = HttpService.httpService(url);
+        // Build HttpService safely. cfg.host may already contain a port (e.g., 127.0.0.1:5013).
+        String hostOnly = cfg.host;
+        int port = cfg.port;
+        try {
+            String h = cfg.host == null ? "" : cfg.host.trim();
+            // IPv6 in brackets: [::1]:5013
+            if (h.startsWith("[") && h.contains("]")) {
+                int end = h.indexOf(']');
+                hostOnly = h.substring(0, end + 1);
+                if (h.length() > end + 2 && h.charAt(end + 1) == ':') {
+                    port = Integer.parseInt(h.substring(end + 2));
+                }
+            } else if (h.contains(":")) {
+                int idx = h.lastIndexOf(':');
+                String p = h.substring(idx + 1);
+                // if the tail is numeric, treat it as port
+                if (p.matches("\\d+")) {
+                    hostOnly = h.substring(0, idx);
+                    port = Integer.parseInt(p);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        boolean secure = "https".equalsIgnoreCase(cfg.scheme);
+        HttpService service = HttpService.httpService(hostOnly, port, secure);
         HttpRequest req = HttpRequest.httpRequest(service, http);
 
         MontoyaApi api = GqlAsaExtension.API;

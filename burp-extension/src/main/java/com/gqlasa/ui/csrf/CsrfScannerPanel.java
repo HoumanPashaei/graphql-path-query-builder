@@ -112,6 +112,7 @@ public class CsrfScannerPanel extends JPanel {
     private volatile HttpRequestResponse baseline;
     private volatile HttpRequest baselineRequest;
     private volatile HttpResponse baselineResponse;
+    // SameSite cannot be reliably inferred from a single request handed to the scanner.
 
     private final AtomicBoolean stopRequested = new AtomicBoolean(false);
     private volatile ExecutorService currentPool;
@@ -305,8 +306,8 @@ public class CsrfScannerPanel extends JPanel {
             table.getColumnModel().getColumn(1).setPreferredWidth(80);
             table.getColumnModel().getColumn(2).setPreferredWidth(80);
             table.getColumnModel().getColumn(3).setPreferredWidth(90);
-            table.getColumnModel().getColumn(4).setPreferredWidth(120);
-            table.getColumnModel().getColumn(5).setPreferredWidth(260);
+            table.getColumnModel().getColumn(4).setPreferredWidth(130);
+            table.getColumnModel().getColumn(5).setPreferredWidth(320);
         }
 
         // Bold rows with Potential=Yes
@@ -595,7 +596,7 @@ public class CsrfScannerPanel extends JPanel {
         base.method = baselineRequest.method();
         base.status = baselineResponse != null ? baselineResponse.statusCode() : 0;
         base.length = safeBody(baselineResponse).length();
-        base.potential = "";
+        base.potential = "-";
         base.notes = "";
         model.addRow(base);
     }
@@ -624,6 +625,26 @@ public class CsrfScannerPanel extends JPanel {
 
         model.clearAll();
         pageIndex = 0;
+
+        // Always re-send baseline once at scan start.
+        // (Imported history items may not have an up-to-date response, and some targets are stateful.)
+        try {
+            HttpRequest toSend = baselineRequest;
+            String bb = safeBodyStr(toSend);
+            if (bb != null) {
+                String trimmed = bb.trim();
+                if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                    toSend = setOrReplaceHeader(toSend, "Content-Type", "application/json");
+                    toSend = stripContentLength(toSend);
+                }
+            }
+            HttpRequestResponse fresh = api.http().sendRequest(toSend);
+            baselineResponse = fresh.response();
+        } catch (Exception ex) {
+            // Fall back to the response that came with the imported request (if any).
+            api.logging().logToError("CSRF baseline re-send failed: " + ex);
+        }
+
         addBaselineRow();
 
         ScanOptions opt = readOptionsFromUI();
@@ -758,6 +779,17 @@ public class CsrfScannerPanel extends JPanel {
         }
     }
 
+    private static String safeBodyStr(HttpRequest req) {
+        if (req == null) return null;
+        try {
+            ByteArray b = req.body();
+            if (b == null) return null;
+            return b.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> tryParseJson(String body) {
         try {
@@ -773,9 +805,11 @@ public class CsrfScannerPanel extends JPanel {
     private boolean isSimilar(String baselineBody, Map<String, Object> baselineMap, String variantBody, HttpResponse variantResp, ScanOptions opt) {
         if (variantResp == null) return false;
 
-        // Status code equality is a strong signal.
+        // Status code can legitimately differ (e.g., 302 vs 200) while still indicating a successful state change.
+        // Treat mismatches as a hard-fail only when the variant is clearly an error and baseline isn't.
         int baseStatus = baselineResponse != null ? baselineResponse.statusCode() : 0;
-        if (baseStatus != 0 && variantResp.statusCode() != baseStatus) return false;
+        int varStatus = variantResp.statusCode();
+        if (baseStatus >= 200 && baseStatus < 400 && varStatus >= 400) return false;
 
         Map<String, Object> varMap = tryParseJson(variantBody);
 
@@ -821,19 +855,37 @@ public class CsrfScannerPanel extends JPanel {
 
         // Header-based scenarios
         if (opt.testHeaders) {
-            // Only add No Authorization if baseline has Authorization
-            if (headerValue(base, "Authorization") != null) {
-                out.add(new Variant("No Authorization", removeHeader(base, "Authorization"), "Removed Authorization header"));
+            // IMPORTANT: Removing Authorization/Cookie is not a CSRF signal by itself (it's expected to fail).
+            // These variants were intentionally removed to reduce false positives and noise.
+
+            // Only remove origin/referer if they exist in the baseline request.
+            if (headerValue(base, "Origin") != null) {
+                out.add(new Variant("No Origin", removeHeader(base, "Origin"), "Removed Origin header"));
             }
-            // Only add No Cookie if baseline has Cookie
-            if (headerValue(base, "Cookie") != null) {
-                out.add(new Variant("No Cookie", removeHeader(base, "Cookie"), "Removed Cookie header"));
+            if (headerValue(base, "Referer") != null) {
+                out.add(new Variant("No Referer", removeHeader(base, "Referer"), "Removed Referer header"));
             }
 
-            out.add(new Variant("No Origin", removeHeader(base, "Origin"), "Removed Origin header"));
-            out.add(new Variant("No Referer", removeHeader(base, "Referer"), "Removed Referer header"));
+            // Origin/Referer manipulation tests (may reveal naive origin checks)
             out.add(new Variant("Origin: null", setOrReplaceHeader(base, "Origin", "null"), "Set Origin to null"));
+            out.add(new Variant("Origin: https://evil.example", setOrReplaceHeader(base, "Origin", "https://evil.example"), "Set Origin to attacker origin"));
+            out.add(new Variant("Origin: http://evil.example", setOrReplaceHeader(base, "Origin", "http://evil.example"), "Set Origin to attacker origin"));
+
+            out.add(new Variant("Referer: null", setOrReplaceHeader(base, "Referer", "null"), "Set Referer to null"));
             out.add(new Variant("Referer: https://evil.example/", setOrReplaceHeader(base, "Referer", "https://evil.example/"), "Set Referer to attacker origin"));
+            out.add(new Variant("Referer: http://evil.example/", setOrReplaceHeader(base, "Referer", "http://evil.example/"), "Set Referer to attacker origin"));
+
+            // If the baseline request contains common CSRF-related headers, test without them.
+            // These are only meaningful when they exist in the baseline request.
+            String[] csrfHeaders = new String[]{
+                    "X-CSRF-Token", "X-CSRFToken", "X-XSRF-TOKEN", "CSRF-Token", "XSRF-Token",
+                    "X-Requested-With", "X-API-Key", "X-Auth-Token"
+            };
+            for (String h : csrfHeaders) {
+                if (headerValue(base, h) != null) {
+                    out.add(new Variant("No " + h, removeHeader(base, h), "Removed " + h + " header"));
+                }
+            }
         }
 
         // Content-Type fuzzing (browser-simple types + common GraphQL variants)
@@ -1006,10 +1058,25 @@ public class CsrfScannerPanel extends JPanel {
 	private static HttpRequest mutateContentTypeAndBody(HttpRequest base, String contentType, String newBody) {
         HttpRequest r = setOrReplaceHeader(base, "Content-Type", contentType);
         if (newBody != null) {
-            return r.withBody(ByteArray.byteArray(newBody));
+            r = r.withBody(ByteArray.byteArray(newBody));
         }
-        return r;
+		return stripContentLength(r);
     }
+
+	private static HttpRequest stripContentLength(HttpRequest req) {
+		if (req == null) return null;
+		HttpRequest out = req;
+		try {
+			for (burp.api.montoya.http.message.HttpHeader h : req.headers()) {
+				if ("content-length".equalsIgnoreCase(h.name())) {
+					out = out.withRemovedHeader(h);
+				}
+			}
+		} catch (Exception ignored) {
+			return req;
+		}
+		return out;
+	}
 
     private static String buildApplicationGraphqlBody(HttpRequest base) {
         Map<String, Object> map = tryParseJson(base.body() != null ? base.body().toString() : "");
@@ -1111,6 +1178,7 @@ public class CsrfScannerPanel extends JPanel {
             req = updateHeader(req, "Content-Type", null, true);
             req = updateHeader(req, "Content-Length", null, true);
             req = req.withBody("");
+            req = stripContentLength(req);
             return new Variant(name, req, includeVariables ? "GET variables" : "GET query");
         } catch (Exception e) {
             return null;
