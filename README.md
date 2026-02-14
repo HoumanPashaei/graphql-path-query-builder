@@ -102,4 +102,4 @@ If you find a vulnerability in this extension, please follow **SECURITY.md**.
 
 ## 📜 License
 
-Add your license here (MIT/Apache-2.0/GPL/etc).
+MIT License
