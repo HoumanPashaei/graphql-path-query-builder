@@ -84,7 +84,7 @@ public class SchemaPanel extends JPanel {
 
         File f = chooser.getSelectedFile();
 
-        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Loading schema (this may take a few minutes on large schemas)...");
+        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Loading Schema (This may take a few minutes on large Schemas)...");
         pd.showDialog();
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {
@@ -106,8 +106,8 @@ public class SchemaPanel extends JPanel {
                     pd.complete("Loaded.");
                 } catch (Exception ex) {
                     pd.complete("Failed.");
-                    JOptionPane.showMessageDialog(SchemaPanel.this, "Failed to read file: " + ex.getMessage(),
-                            "Schema load error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(SchemaPanel.this, "Failed to Read file: " + ex.getMessage(),
+                            "Schema Load Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         };
@@ -117,11 +117,11 @@ public class SchemaPanel extends JPanel {
     private void onFormatAsync() {
         String current = schemaArea.getText();
         if (current == null || current.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Schema is empty.", "Format", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Schema is Empty.", "Format", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Formatting schema (this may take a few minutes on large schemas)...");
+        ProgressDialog pd = new ProgressDialog(SwingUtilities.getWindowAncestor(this), "Formatting Schema (This may take a few minutes on large schemas)...");
         pd.showDialog();
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {

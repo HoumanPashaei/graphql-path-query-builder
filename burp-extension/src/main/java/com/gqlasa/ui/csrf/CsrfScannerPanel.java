@@ -651,8 +651,10 @@ public class CsrfScannerPanel extends JPanel {
 
         // Build variants
         List<Variant> variants = buildVariants(baselineRequest, opt);
+        // If the user limits the number of variants, we still want GET-based tests
+        // to always be executed (they are often the most CSRF-relevant for GraphQL).
         if (opt.maxVariants > 0 && variants.size() > opt.maxVariants) {
-            variants = variants.subList(0, opt.maxVariants);
+            variants = limitVariantsButKeepGet(variants, opt.maxVariants);
         }
 
         ExecutorService pool = Executors.newFixedThreadPool(opt.concurrency);
@@ -853,27 +855,40 @@ public class CsrfScannerPanel extends JPanel {
     private List<Variant> buildVariants(HttpRequest base, ScanOptions opt) {
         List<Variant> out = new ArrayList<>();
 
+        // Baseline Content-Type drives which CSRF checks are meaningful.
+        // If baseline is application/json, browsers usually trigger a preflight and classic CSRF is less applicable.
+        // Per requirements: do NOT run Origin/Referer variants at all when the baseline is JSON.
+        final String baselineCt = headerValue(base, "Content-Type");
+        final boolean baselineIsJson = isJsonContentType(baselineCt);
+        final boolean baselineIsGet = "GET".equalsIgnoreCase(base.method());
+        final boolean baselineIsCsrfRelevantCt = isCsrfRelevantContentType(baselineCt);
+
         // Header-based scenarios
         if (opt.testHeaders) {
             // IMPORTANT: Removing Authorization/Cookie is not a CSRF signal by itself (it's expected to fail).
             // These variants were intentionally removed to reduce false positives and noise.
 
-            // Only remove origin/referer if they exist in the baseline request.
-            if (headerValue(base, "Origin") != null) {
-                out.add(new Variant("No Origin", removeHeader(base, "Origin"), "Removed Origin header"));
-            }
-            if (headerValue(base, "Referer") != null) {
-                out.add(new Variant("No Referer", removeHeader(base, "Referer"), "Removed Referer header"));
-            }
+            // Origin/Referer checks:
+            // - Only meaningful for CSRF-relevant scenarios (GET or simple/form content-types)
+            // - MUST NOT run at all for JSON baselines (per requirements)
+            if (!baselineIsJson && (baselineIsGet || baselineIsCsrfRelevantCt)) {
+                // Only remove origin/referer if they exist in the baseline request.
+                if (headerValue(base, "Origin") != null) {
+                    out.add(new Variant("No Origin", removeHeader(base, "Origin"), "Removed Origin header"));
+                }
+                if (headerValue(base, "Referer") != null) {
+                    out.add(new Variant("No Referer", removeHeader(base, "Referer"), "Removed Referer header"));
+                }
 
-            // Origin/Referer manipulation tests (may reveal naive origin checks)
-            out.add(new Variant("Origin: null", setOrReplaceHeader(base, "Origin", "null"), "Set Origin to null"));
-            out.add(new Variant("Origin: https://evil.example", setOrReplaceHeader(base, "Origin", "https://evil.example"), "Set Origin to attacker origin"));
-            out.add(new Variant("Origin: http://evil.example", setOrReplaceHeader(base, "Origin", "http://evil.example"), "Set Origin to attacker origin"));
+                // Origin/Referer manipulation tests (may reveal naive origin checks)
+                out.add(new Variant("Origin: null", setOrReplaceHeader(base, "Origin", "null"), "Set Origin to null"));
+                out.add(new Variant("Origin: https://evil.example", setOrReplaceHeader(base, "Origin", "https://evil.example"), "Set Origin to attacker origin"));
+                out.add(new Variant("Origin: http://evil.example", setOrReplaceHeader(base, "Origin", "http://evil.example"), "Set Origin to attacker origin"));
 
-            out.add(new Variant("Referer: null", setOrReplaceHeader(base, "Referer", "null"), "Set Referer to null"));
-            out.add(new Variant("Referer: https://evil.example/", setOrReplaceHeader(base, "Referer", "https://evil.example/"), "Set Referer to attacker origin"));
-            out.add(new Variant("Referer: http://evil.example/", setOrReplaceHeader(base, "Referer", "http://evil.example/"), "Set Referer to attacker origin"));
+                out.add(new Variant("Referer: null", setOrReplaceHeader(base, "Referer", "null"), "Set Referer to null"));
+                out.add(new Variant("Referer: https://evil.example/", setOrReplaceHeader(base, "Referer", "https://evil.example/"), "Set Referer to attacker origin"));
+                out.add(new Variant("Referer: http://evil.example/", setOrReplaceHeader(base, "Referer", "http://evil.example/"), "Set Referer to attacker origin"));
+            }
 
             // If the baseline request contains common CSRF-related headers, test without them.
             // These are only meaningful when they exist in the baseline request.
@@ -939,6 +954,31 @@ public class CsrfScannerPanel extends JPanel {
         LinkedHashMap<String, Variant> uniq = new LinkedHashMap<>();
         for (Variant v : out) uniq.putIfAbsent(v.name, v);
         return new ArrayList<>(uniq.values());
+    }
+
+    private static boolean isJsonContentType(String ct) {
+        if (ct == null) return false;
+        String v = ct.trim().toLowerCase(Locale.ROOT);
+        if (v.isEmpty()) return false;
+        // Accept common JSON content-types.
+        if (v.startsWith("application/json")) return true;
+        if (v.startsWith("application/vnd.api+json")) return true;
+        // vendor json types: application/*+json
+        return v.startsWith("application/") && v.contains("+json");
+    }
+
+    /**
+     * Content-Types that are typically "simple" or form-based and can be sent by browsers
+     * without JSON semantics.
+     */
+    private static boolean isCsrfRelevantContentType(String ct) {
+        if (ct == null) return false;
+        String v = ct.trim().toLowerCase(Locale.ROOT);
+        if (v.isEmpty()) return false;
+        if (v.startsWith("text/plain")) return true;
+        if (v.startsWith("application/x-www-form-urlencoded")) return true;
+        if (v.startsWith("multipart/form-data")) return true;
+        return false;
     }
 
 
@@ -1242,7 +1282,6 @@ public class CsrfScannerPanel extends JPanel {
                 "</style></head><body>" +
                 "<div class='section'><h3>Attack explanation</h3>" +
                 "<p><b>Scenario:</b> " + scenario + "</p>" +
-                "<p><b>Mode:</b> " + mode + "</p>" +
                 "</div>" +
                 baselineCmp +
                 "<div class='section'><h3>Reason</h3>" +
@@ -1254,6 +1293,50 @@ public class CsrfScannerPanel extends JPanel {
                 "</div>" +
                 "</body></html>";
         return html;
+    }
+
+    private static List<Variant> limitVariantsButKeepGet(List<Variant> all, int max) {
+        if (all == null) return Collections.emptyList();
+        if (max <= 0 || all.size() <= max) return all;
+
+        // Collect GET variants from the full list.
+        List<Variant> getVariants = new ArrayList<>();
+        for (Variant v : all) {
+            if (isGetVariant(v)) {
+                getVariants.add(v);
+            }
+        }
+
+        List<Variant> limited = new ArrayList<>(all.subList(0, max));
+
+        // Ensure every GET variant exists in the limited list.
+        for (Variant gv : getVariants) {
+            boolean present = false;
+            for (Variant v : limited) {
+                if (v != null && Objects.equals(v.name, gv.name)) {
+                    present = true;
+                    break;
+                }
+            }
+            if (present) continue;
+
+            // Remove the last non-GET item to make room.
+            for (int i = limited.size() - 1; i >= 0; i--) {
+                if (!isGetVariant(limited.get(i))) {
+                    limited.remove(i);
+                    break;
+                }
+            }
+            if (limited.size() < max) {
+                limited.add(gv);
+            }
+        }
+        return limited;
+    }
+
+    private static boolean isGetVariant(Variant v) {
+        if (v == null || v.name == null) return false;
+        return v.name.toUpperCase(Locale.ROOT).startsWith("GET");
     }
 
 

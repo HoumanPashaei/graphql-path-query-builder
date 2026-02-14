@@ -28,7 +28,7 @@ public class MainPanel extends JPanel {
         tabs.addTab("Query Builder", queryBuilderPanel);
         tabs.addTab("CSRF Scanner", csrfScannerPanel);
         tabs.addTab("DoS Scanner", dosScannerPanel);
-        tabs.addTab("CSWS Hijacking", placeholder("Planned"));
+        // CSWS Hijacking tab removed (per request)
 
         add(tabs, BorderLayout.CENTER);
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));

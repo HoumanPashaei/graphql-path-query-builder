@@ -581,13 +581,13 @@ public class DosScannerPanel extends JPanel {
         if (res != JFileChooser.APPROVE_OPTION) return;
         try {
             schemaProgress.setVisible(true);
-            schemaStatus.setText("Loading schema file... please wait.");
+            schemaStatus.setText("Loading Schema File... Please Wait.");
             java.nio.file.Path p = fc.getSelectedFile().toPath();
             String content = java.nio.file.Files.readString(p, java.nio.charset.StandardCharsets.UTF_8);
             schemaArea.setText(content);
             // parse will be triggered by document listener
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Failed to read schema file: " + ex.getMessage(), "Schema import", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Failed to Read Schema File: " + ex.getMessage(), "Schema import", JOptionPane.ERROR_MESSAGE);
         } finally {
             schemaProgress.setVisible(false);
         }
@@ -599,7 +599,7 @@ public class DosScannerPanel extends JPanel {
             schemaModel = null;
             heavyListModel.clear();
             allTypesModel.clear();
-            schemaStatus.setText("Schema cleared.");
+            schemaStatus.setText("Schema Cleared.");
             return;
         }
 
