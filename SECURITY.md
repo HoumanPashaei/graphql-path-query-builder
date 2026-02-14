@@ -1,26 +1,67 @@
-# Security Policy
+# 🔐 Security Policy
 
-## Supported Versions
+Thank you for helping improve the security of **GQL-ASA**. 🛡️  
+This document explains how to report vulnerabilities responsibly.
 
-Only the latest tagged release is supported with security fixes.
+---
 
-## Reporting a Vulnerability
+## ✅ Supported Versions
 
-If you believe you have found a security vulnerability in this project, please report it responsibly.
+Security updates are provided for the latest release and the `main` branch.
 
-- Do **not** open a public GitHub Issue for the vulnerability.
-- Use one of the following private channels instead:
-  - GitHub: **Private vulnerability reporting** (if enabled on the repository), or
-  - Email: contact the repository maintainer (add an email address here if you want).
+| Version | Supported |
+|--------:|:---------|
+| Latest release | ✅ |
+| `main` branch | ✅ |
+| Older versions | ❌ |
 
-Please include:
+---
+
+## 🚨 Reporting a Vulnerability
+
+Please **do not** open public GitHub issues for security vulnerabilities.
+
+Instead, report privately with:
 - A clear description of the issue
-- Steps to reproduce (PoC)
-- Expected vs actual behavior
-- Any relevant logs, schema samples (sanitized), or screenshots
+- Steps to reproduce
+- Impact assessment (what can be done?)
+- Screenshots/logs if applicable
+- Your environment details (Burp version, Java version, OS)
 
-## Scope / Disclaimer
+### Preferred channel
+- GitHub **Security Advisories** (Private report)
 
-This tool is intended for **authorized security testing and internal analysis only**.
-It generates payload templates based on schema structure and does not perform runtime authorization checks.
-Use it only on systems you own or have explicit permission to test.
+If that is not available:
+- Open a private discussion with the maintainers (or share a secure contact method in the repository).
+
+---
+
+## ⏱️ Response Timeline
+
+We aim to:
+- Acknowledge reports within **72 hours**
+- Provide an initial assessment within **7 days**
+- Ship a fix as soon as reasonably possible depending on severity
+
+---
+
+## 🧠 Scope
+
+In scope:
+- Code execution risks
+- Supply-chain risks in build artifacts
+- Data leakage from Burp context
+- Unsafe request handling leading to SSRF-like behavior
+- Injection flaws in request crafting/parsing
+- Any vulnerability that impacts users running the extension
+
+Out of scope:
+- Vulnerabilities in third-party targets you scan (those belong to the target application)
+- Social engineering
+
+---
+
+## 🙏 Responsible Disclosure
+
+Please give us time to patch before public disclosure.  
+We will credit you (if you want) in release notes or advisories.

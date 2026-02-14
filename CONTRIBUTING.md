@@ -1,77 +1,110 @@
-# Contributing
+# 🤝 Contributing to GQL-ASA
 
-This project welcomes issues and pull requests.
+Thanks for considering contributing! 🚀  
+This guide helps you set up the project and submit high-quality contributions.
 
-## 1) Development setup
+---
 
-### Prerequisites
-- Python 3.9+  
-- Git  
+## 🧩 What You Can Contribute
 
-### Create and activate a virtual environment (recommended)
+- 🐛 Bug fixes
+- ✨ New detection scenarios / improved heuristics
+- 🧪 Better test-case coverage (DoS / CSRF)
+- 🖥️ UI/UX improvements for Burp workflows
+- 📚 Documentation enhancements
 
-Create:
+---
+
+## 🛠️ Development Setup
+
+### Requirements
+- Java 17+
+- Maven 3.8+
+- Burp Suite (Community/Pro)
+
+### Build
 ```bash
-python -m venv .venv
+mvn clean package
 ```
 
-Activate on Windows (PowerShell):
-```powershell
-.venv\Scripts\Activate.ps1
-```
+### Load into Burp
+1. Burp → Extensions → Installed → Add
+2. Type: Java
+3. Select the built JAR
 
-Activate on Windows (CMD):
-```cmd
-.venv\Scripts\activate.bat
-```
+---
 
-Activate on Linux/macOS:
+## ✅ Coding Guidelines
+
+### General
+- Keep changes **focused** and **reviewable**
+- Prefer small PRs over large refactors
+- Avoid breaking existing tabs/features unless explicitly intended
+
+### Security & Safety
+- Never store user secrets
+- Do not introduce risky parsing/serialization behavior
+- Avoid network calls that could cause SSRF-like behavior unintentionally
+- Always preserve Burp request integrity when cloning/modifying requests:
+  - handle `Content-Length`
+  - keep headers consistent
+  - avoid malformed JSON or double-encoding
+
+### UI
+- Keep UI responsive:
+  - run network scans off the EDT
+  - use SwingWorker or background threads safely
+- Avoid large blocking operations on the UI thread
+
+---
+
+## 🧪 Testing Checklist
+
+Before submitting a PR:
+- ✅ Build succeeds: `mvn clean package`
+- ✅ Extension loads in Burp without runtime errors
+- ✅ Key workflows tested:
+  - Send request to Query Builder
+  - Send request to DoS Scanner
+  - Send request to CSRF Scanner
+  - Send generated requests to Repeater/Intruder
+- ✅ Verify no regression in existing tabs
+
+---
+
+## 📦 Submitting a Pull Request
+
+1. Fork the repo
+2. Create a feature branch:
 ```bash
-source .venv/bin/activate
+git checkout -b feature/my-change
 ```
-
-### Install dependencies
+3. Commit with a clear message:
 ```bash
-pip install -r requirements.txt
+git commit -m "Fix: preserve GET variants in CSRF scanner"
 ```
-
-## 2) Smoke tests
-
-Help:
+4. Push:
 ```bash
-python gql_path_query_builder.py -h
+git push origin feature/my-change
 ```
+5. Open a PR with:
+- Summary of the change
+- Why it matters
+- How it was tested
+- Screenshots (if UI changed)
 
-Run against the example schema:
-```bash
-python gql_path_query_builder.py -s examples/Schema.simple.json -t User -m burp -M 10
-```
+---
 
-Paths-only mode:
-```bash
-python gql_path_query_builder.py -s examples/Schema.simple.json -t User -p -M 10
-```
+## 🏷️ Issue Labels (suggested)
 
-## 3) Bug reports
+- `bug`
+- `enhancement`
+- `security`
+- `ui/ux`
+- `docs`
 
-When opening an issue, please include:
-- OS (Windows/Linux/macOS) and Python version
-- The exact command you ran
-- Console output / stack trace
-- Expected vs actual behavior
-- A minimal schema sample (sanitized if necessary)
+---
 
-## 4) Pull requests
+## 🙌 Thanks
 
-Guidelines:
-- Keep PRs focused (one change per PR when possible)
-- Add short flag aliases for new CLI options
-- Update `README.md` if user-facing behavior changes
-- Update `CHANGELOG.md` for user-visible changes
-- Ensure CI passes
-
-## 5) Code style
-
-- Prefer explicit, readable code
-- Avoid unnecessary dependencies
-- Keep backward compatibility for CLI flags when possible
+Every contribution helps improve the project. Thank you! 💙
